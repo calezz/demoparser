@@ -2,6 +2,7 @@ use parser::parser_settings::Parser;
 use parser::parser_settings::ParserInputs;
 use parser::variants::Variant;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::io::Read;
 use wasm_bindgen::prelude::*;
@@ -178,6 +179,50 @@ pub fn parse_events(file: web_sys::File, event_name: Option<String>) -> Result<J
         js_events.push(js_hm_this_event);
     }
     return Ok(serde_wasm_bindgen::to_value(&Example { output: js_events }).unwrap());
+}
+
+#[wasm_bindgen]
+pub fn parse_events2(file: web_sys::File, event_name: Option<String>) -> Result<JsValue, JsError> {
+    let mut wf = WebSysFile::new(file);
+    let mut buf = vec![];
+    wf.read_to_end(&mut buf).unwrap();
+
+    let settings = ParserInputs {
+        bytes: &buf,
+        wanted_player_props: vec![],
+        wanted_player_props_og_names: vec![],
+        wanted_other_props: vec![],
+        wanted_other_props_og_names: vec![],
+        wanted_event: Some(event_name.unwrap()),
+        parse_ents: true,
+        wanted_ticks: vec![],
+        parse_projectiles: false,
+        only_header: false,
+        count_props: false,
+        only_convars: false,
+    };
+
+    let mut parser = match Parser::new(settings) {
+        Ok(parser) => parser,
+        Err(e) => return Err(JsError::new(&format!("{}", e))),
+    };
+    match parser.start() {
+        Ok(_) => {}
+        Err(e) => return Err(JsError::new(&format!("{}", e))),
+    };
+
+    let mut js_events: Vec<HashMap<String, String>> = vec![];
+
+    let s = serde_json::to_string(&parser.game_events).unwrap();
+
+    for event in parser.game_events {
+        let mut js_hm_this_event: HashMap<String, String> = HashMap::default();
+        for f in event.fields {
+            js_hm_this_event.insert(f.name, to_string_js(f.data.unwrap_or(Variant::I32(0))));
+        }
+        js_events.push(js_hm_this_event);
+    }
+    return Ok(serde_wasm_bindgen::to_value(&s).unwrap());
 }
 
 pub fn to_string_js(val: Variant) -> String {

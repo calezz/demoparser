@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use crate::game_events::EventField;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum Variant {
     Bool(bool),
     U32(u32),

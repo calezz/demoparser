@@ -28,6 +28,8 @@ async function run_wasm() {
 
 function generateTableFromData(events) {
 
+    console.log(events);
+
     const tbl = document.createElement("table");
     const tblBody = document.createElement("tbody");
 

@@ -10,6 +10,7 @@ use csgoproto::netmessages::CSVCMsg_GameEventList;
 use csgoproto::networkbasetypes::csvcmsg_game_event::Key_t;
 use csgoproto::networkbasetypes::CSVCMsg_GameEvent;
 use protobuf::Message;
+use serde::Serialize;
 
 static INTERNALEVENTFIELDS: &'static [&str] = &[
     "userid",
@@ -279,12 +280,12 @@ fn parse_key(key: &Key_t) -> Option<Variant> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EventField {
     pub name: String,
     pub data: Option<Variant>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GameEvent {
     pub name: String,
     pub fields: Vec<EventField>,
