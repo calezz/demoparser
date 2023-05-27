@@ -1,4 +1,5 @@
-use serde::Serialize;
+use ahash::HashMap;
+use serde::{ser::SerializeMap, Serialize};
 
 use crate::game_events::EventField;
 
@@ -28,7 +29,7 @@ Uint64(u64),
 I32(i32),
 */
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum VarVec {
     U32(Vec<Option<u32>>),
     Bool(Vec<Option<bool>>),
@@ -51,12 +52,77 @@ impl VarVec {
         }
     }
 }
+#[derive(Debug, Clone)]
+pub struct SerdS {
+    pub inner: HashMap<String, PropColumn>,
+}
+
+impl Serialize for SerdS {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(2))?;
+
+        for (k, v) in &self.inner {
+            match &v.data {
+                Some(VarVec::F32(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::I32(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::String(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::U64(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::Bool(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::U32(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                None => {}
+            };
+        }
+        map.end()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct PropColumn {
     pub data: Option<VarVec>,
     num_nones: usize,
 }
+/*
+pub fn to_serdeable(hm: &HashMap<String, PropColumn>) {
+    for (k, v) in hm {
+        match v {
+            VarVec::F32(val) => {
+
+            }
+            VarVec::I32(val) => {
+
+            }
+            VarVec::String(val) => {
+
+            }
+            VarVec::U64(val) => {
+
+            }
+            VarVec::Bool(val) => {
+
+            }
+            VarVec::U32(val) => {
+
+            }
+        }
+    }
+}
+*/
+
 impl PropColumn {
     pub fn new() -> Self {
         PropColumn {

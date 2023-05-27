@@ -113,13 +113,17 @@ impl<'a> Parser<'a> {
             let decoder = class.serializer.find_decoder(&path, 0);
             let result = bitreader.decode(&decoder)?;
             // Can be used for debugging output
-            if 0 == 1 {
+            if 1 == 1 {
                 let debug_field =
                     class
                         .serializer
                         .debug_find_decoder(&path, 0, class.serializer.name.clone());
-
-                // println!("{:#?} {:?}", debug_field.full_name, result);
+                if debug_field
+                    .full_name
+                    .contains("CCSPlayerController.m_pActionTrackingServices.m_iDamage")
+                {
+                    println!("{:#?}@{:?}", debug_field.full_name, result);
+                }
             }
 
             if self.wanted_prop_paths.contains(&path.path)
@@ -127,7 +131,7 @@ impl<'a> Parser<'a> {
             {
                 entity.props.insert(path.path, result);
             }
-            //entity.props.insert(path.path, result);
+            // entity.props.insert(path.path, result);
         }
         Ok(n_paths)
     }

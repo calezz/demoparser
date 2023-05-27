@@ -135,6 +135,6 @@ impl<'a> Bitreader<'a> {
     pub fn read_angle(&mut self, n: usize) -> Result<f32, DemoParserError> {
         let bits = self.read_nbits(n as u32)?;
         let x = f32::from_ne_bytes(bits.to_ne_bytes());
-        Ok(x * 360.0 / ((1 << n) as f32))
+        Ok(x / ((1 << n) as f32))
     }
 }
