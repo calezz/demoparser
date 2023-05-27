@@ -76,6 +76,15 @@ df = parser.parse_ticks(wanted_fields)
 
 
 ### List of values to try for parse_ticks():
+Some example props that can be gotten from players.
+
+|         Name          | Real name                            | Desc                                                                                                           |
+| :-------------------: | :----------------------------------- | :------------------------------------------------------------------------------------------------------------- |
+X| m_cellX and m_vecX| X coordinate
+Y| m_cellY and m_vecY| Y coordinate
+Z| m_cellZ and m_vecZ| Z coordinate
+
+
 
 ### Player data
 "X"  

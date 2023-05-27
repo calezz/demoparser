@@ -19,7 +19,7 @@ async function run_wasm() {
             myWorker.onmessage = function (e) {
                 var endTime = performance.now()
                 console.log(`Parsing took: ${(endTime - startTime) / 1000} seconds`)
-                generateTableFromData(e.data.output)
+                generateTableFromData(e.data)
             };
         },
         false

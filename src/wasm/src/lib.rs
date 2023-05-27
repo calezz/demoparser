@@ -1,3 +1,4 @@
+use parser::parser_settings::rm_user_friendly_names;
 use parser::parser_settings::Parser;
 use parser::parser_settings::ParserInputs;
 use parser::variants::Variant;
@@ -29,13 +30,13 @@ pub struct Ticks {
 }
 
 #[wasm_bindgen]
-pub fn parse_chat_messages(file: web_sys::File) -> Result<JsValue, JsError> {
-    let mut wf = WebSysFile::new(file);
-    let mut buf = vec![];
-    wf.read_to_end(&mut buf).unwrap();
+pub fn parse_chat_messages(file: Option<String>) -> Result<JsValue, JsError> {
+    use std::fs;
+    //let mut wf = WebSysFile::new(file);
+    let bytes = fs::read(file.unwrap()).unwrap();
 
     let settings = ParserInputs {
-        bytes: &buf,
+        bytes: &bytes,
         wanted_player_props: vec![],
         wanted_player_props_og_names: vec![],
         wanted_other_props: vec![],
@@ -182,7 +183,11 @@ pub fn parse_events(file: web_sys::File, event_name: Option<String>) -> Result<J
 }
 
 #[wasm_bindgen]
-pub fn parse_events2(file: web_sys::File, event_name: Option<String>) -> Result<JsValue, JsError> {
+pub fn parse_events2(
+    file: web_sys::File,
+    event_name: Option<String>,
+    wanted_props: Box<[JsValue]>,
+) -> Result<JsValue, JsError> {
     let mut wf = WebSysFile::new(file);
     let mut buf = vec![];
     wf.read_to_end(&mut buf).unwrap();
@@ -223,6 +228,52 @@ pub fn parse_events2(file: web_sys::File, event_name: Option<String>) -> Result<
         js_events.push(js_hm_this_event);
     }
     return Ok(serde_wasm_bindgen::to_value(&s).unwrap());
+}
+#[wasm_bindgen]
+pub fn parse_ticks(file: web_sys::File, wanted_props: Box<[JsValue]>) -> Result<JsValue, JsError> {
+    let mut wf = WebSysFile::new(file);
+    let mut buf = vec![];
+    wf.read_to_end(&mut buf).unwrap();
+
+    let v = wanted_props.into_vec();
+    let mut wanted_props = vec![];
+    for x in v {
+        wanted_props.push(x.as_string().unwrap());
+        log_to_browser(x.as_string().unwrap());
+    }
+    let real_names = rm_user_friendly_names(&wanted_props)?;
+
+    let settings = ParserInputs {
+        bytes: &buf,
+        wanted_player_props: real_names,
+        wanted_player_props_og_names: wanted_props,
+        wanted_other_props: vec![],
+        wanted_other_props_og_names: vec![],
+        wanted_event: Some("".to_string()),
+        parse_ents: true,
+        wanted_ticks: vec![10000, 10001],
+        parse_projectiles: false,
+        only_header: false,
+        count_props: false,
+        only_convars: false,
+    };
+
+    let mut parser = match Parser::new(settings) {
+        Ok(parser) => parser,
+        Err(e) => return Err(JsError::new(&format!("{}", e))),
+    };
+    match parser.start() {
+        Ok(_) => {}
+        Err(e) => return Err(JsError::new(&format!("{}", e))),
+    };
+    use parser::variants::SerdS;
+
+    let s = SerdS {
+        inner: parser.output,
+    };
+    let x = serde_json::to_string_pretty(&s).unwrap();
+
+    return Ok(serde_wasm_bindgen::to_value(&x).unwrap());
 }
 
 pub fn to_string_js(val: Variant) -> String {

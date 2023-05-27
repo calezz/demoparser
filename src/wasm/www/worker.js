@@ -1,6 +1,6 @@
 importScripts('./pkg/wasmparser.js');
 
-const { parse_events2, parse_chat_messages, parse_skins } = wasm_bindgen;
+const { parse_ticks, parse_chat_messages, parse_skins } = wasm_bindgen;
 
 // We compiled with `--target no-modules`, which does not create a module. The generated bindings
 // can be loaded in web workers in all modern browsers.
@@ -18,11 +18,10 @@ onmessage = async function (e) {
     console.log("onmessage inside worker.js runs");
     console.log("event name:" + e.data.event_name);
     
-    let result = parse_events2(
+    let result = parse_ticks(
         e.data.file,
-        e.data.event_name,
+        ["crosshair_code", "Y"],
     );
-    
 
     /*
     let result = parse_skins(
