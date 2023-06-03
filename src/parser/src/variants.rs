@@ -3,7 +3,7 @@ use serde::{ser::SerializeMap, Serialize};
 
 use crate::game_events::EventField;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub enum Variant {
     Bool(bool),
     U32(u32),
@@ -52,12 +52,31 @@ impl VarVec {
         }
     }
 }
+impl Serialize for Variant {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Variant::Bool(b) => serializer.serialize_bool(*b),
+            Variant::F32(f) => serializer.serialize_f32(*f),
+            Variant::I16(i) => serializer.serialize_i16(*i),
+            Variant::I32(i) => serializer.serialize_i32(*i),
+            Variant::String(s) => serializer.serialize_str(s),
+            Variant::U32(u) => serializer.serialize_u32(*u),
+            Variant::U64(u) => serializer.serialize_u64(*u),
+            Variant::U8(u) => serializer.serialize_u8(*u),
+            _ => panic!("cant ser: {:?}", self),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct SerdS {
+pub struct OutputSerdeHelperStruct {
     pub inner: HashMap<String, PropColumn>,
 }
 
-impl Serialize for SerdS {
+impl Serialize for OutputSerdeHelperStruct {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

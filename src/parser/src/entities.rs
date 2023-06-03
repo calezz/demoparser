@@ -113,7 +113,7 @@ impl<'a> Parser<'a> {
             let decoder = class.serializer.find_decoder(&path, 0);
             let result = bitreader.decode(&decoder)?;
             // Can be used for debugging output
-            if 1 == 1 {
+            if 0 == 1 {
                 let debug_field =
                     class
                         .serializer
@@ -316,7 +316,6 @@ impl<'a> Parser<'a> {
             EntityType::Rules => self.rules_entity_id = Some(*entity_id),
             _ => {}
         };
-
         let entity = Entity {
             entity_id: *entity_id,
             cls_id: cls_id,

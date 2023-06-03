@@ -1,7 +1,6 @@
 use ahash::HashMap;
 use parser::parser_settings::Parser;
 use parser::parser_settings::ParserInputs;
-use parser::variants::SerdS;
 use std::fs;
 use std::time::Instant;
 

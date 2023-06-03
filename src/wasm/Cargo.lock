@@ -518,6 +518,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0046fef7e28c3804e5e38bfa31ea2a0f73905319b677e57ebe37e49358989b5d"
 
 [[package]]
+name = "wasmedge-wasi-helper"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd351a86b66f511cbeab0cb848cc9dbd06b4165689c2f992a74500fb809b19dd"
+
+[[package]]
 name = "wasmparser"
 version = "0.1.0"
 dependencies = [
@@ -531,6 +537,7 @@ dependencies = [
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-file-reader",
+ "wasmedge-wasi-helper",
  "web-sys",
 ]
 

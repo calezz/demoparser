@@ -1,6 +1,7 @@
 use parser::parser_settings::rm_user_friendly_names;
 use parser::parser_settings::Parser;
 use parser::parser_settings::ParserInputs;
+use parser::variants::OutputSerdeHelperStruct;
 use parser::variants::Variant;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -32,6 +33,7 @@ pub struct Ticks {
 #[wasm_bindgen]
 pub fn parse_chat_messages(file: Option<String>) -> Result<JsValue, JsError> {
     use std::fs;
+
     //let mut wf = WebSysFile::new(file);
     let bytes = fs::read(file.unwrap()).unwrap();
 
@@ -266,9 +268,8 @@ pub fn parse_ticks(file: web_sys::File, wanted_props: Box<[JsValue]>) -> Result<
         Ok(_) => {}
         Err(e) => return Err(JsError::new(&format!("{}", e))),
     };
-    use parser::variants::SerdS;
 
-    let s = SerdS {
+    let s = OutputSerdeHelperStruct {
         inner: parser.output,
     };
     let x = serde_json::to_string_pretty(&s).unwrap();
