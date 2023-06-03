@@ -5,6 +5,8 @@ env:
   MACOSX_DEPLOYMENT_TARGET: "10.13"
 "on":
   push:
+    branches:
+      - wasmjson
     tags-ignore:
       - "**"
     paths-ignore:
@@ -17,7 +19,6 @@ env:
 jobs:
   build:
     strategy:
-      working-directory: ./src/node/
       fail-fast: false
       matrix:
         settings:
