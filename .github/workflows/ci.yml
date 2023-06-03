@@ -19,6 +19,7 @@ env:
 jobs:
   build:
     strategy:
+      working-directory: ./src/node/
       fail-fast: false
       matrix:
         settings:
