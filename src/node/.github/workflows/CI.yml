@@ -2,17 +2,17 @@ name: CI
 env:
   DEBUG: napi:*
   APP_NAME: demoparser2
-  MACOSX_DEPLOYMENT_TARGET: "10.13"
-"on":
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
+'on':
   push:
     branches:
       - wasmjson
     tags-ignore:
-      - "**"
+      - '**'
     paths-ignore:
-      - "**/*.md"
+      - '**/*.md'
       - LICENSE
-      - "**/*.gitignore"
+      - '**/*.gitignore'
       - .editorconfig
       - docs/**
   pull_request: null
@@ -142,7 +142,7 @@ jobs:
         if: ${{ matrix.settings.docker }}
         with:
           image: ${{ matrix.settings.docker }}
-          options: "--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build"
+          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
           run: ${{ matrix.settings.build }}
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -215,9 +215,9 @@ jobs:
           - host: windows-latest
             target: x86_64-pc-windows-msvc
         node:
-          - "14"
-          - "16"
-          - "18"
+          - '14'
+          - '16'
+          - '18'
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v3
@@ -247,9 +247,9 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - "14"
-          - "16"
-          - "18"
+          - '14'
+          - '16'
+          - '18'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -279,9 +279,9 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - "14"
-          - "16"
-          - "18"
+          - '14'
+          - '16'
+          - '18'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -313,9 +313,9 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - "14"
-          - "16"
-          - "18"
+          - '14'
+          - '16'
+          - '18'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -341,7 +341,7 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: node:${{ matrix.node }}-slim
-          options: "--platform linux/arm64 -v ${{ github.workspace }}:/build -w /build"
+          options: '--platform linux/arm64 -v ${{ github.workspace }}:/build -w /build'
           run: |
             set -e
             yarn test
@@ -375,7 +375,7 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: node:lts-alpine
-          options: "--platform linux/arm64 -v ${{ github.workspace }}:/build -w /build"
+          options: '--platform linux/arm64 -v ${{ github.workspace }}:/build -w /build'
           run: |
             set -e
             yarn test
@@ -387,9 +387,9 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - "14"
-          - "16"
-          - "18"
+          - '14'
+          - '16'
+          - '18'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -414,7 +414,7 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: node:${{ matrix.node }}-bullseye-slim
-          options: "--platform linux/arm/v7 -v ${{ github.workspace }}:/build -w /build"
+          options: '--platform linux/arm/v7 -v ${{ github.workspace }}:/build -w /build'
           run: |
             set -e
             yarn test

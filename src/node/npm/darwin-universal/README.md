@@ -1,3 +1,3 @@
-# `demoparser2-darwin-universal`
+# `@laihoe/demoparser2-darwin-universal`
 
-This is the **universal-apple-darwin** binary for `demoparser2`
+This is the **universal-apple-darwin** binary for `@laihoe/demoparser2`

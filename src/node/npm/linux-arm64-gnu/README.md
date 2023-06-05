@@ -1,3 +1,3 @@
-# `demoparser2-linux-arm64-gnu`
+# `@laihoe/demoparser2-linux-arm64-gnu`
 
-This is the **aarch64-unknown-linux-gnu** binary for `demoparser2`
+This is the **aarch64-unknown-linux-gnu** binary for `@laihoe/demoparser2`

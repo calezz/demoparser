@@ -1,3 +1,3 @@
-# `demoparser2-win32-arm64-msvc`
+# `@laihoe/demoparser2-win32-arm64-msvc`
 
-This is the **aarch64-pc-windows-msvc** binary for `demoparser2`
+This is the **aarch64-pc-windows-msvc** binary for `@laihoe/demoparser2`

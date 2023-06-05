@@ -1,6 +1,6 @@
 {
-  "name": "demoparser2-darwin-x64",
-  "version": "0.0.0",
+  "name": "@laihoe/demoparser2-darwin-x64",
+  "version": "0.0.4",
   "os": [
     "darwin"
   ],

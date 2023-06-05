@@ -1,3 +1,3 @@
-# `demoparser2-darwin-x64`
+# `@laihoe/demoparser2-darwin-x64`
 
-This is the **x86_64-apple-darwin** binary for `demoparser2`
+This is the **x86_64-apple-darwin** binary for `@laihoe/demoparser2`

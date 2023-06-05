@@ -1,3 +1,3 @@
-# `demoparser2-linux-arm-gnueabihf`
+# `@laihoe/demoparser2-linux-arm-gnueabihf`
 
-This is the **armv7-unknown-linux-gnueabihf** binary for `demoparser2`
+This is the **armv7-unknown-linux-gnueabihf** binary for `@laihoe/demoparser2`

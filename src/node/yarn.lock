@@ -12,6 +12,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@laihoe/demoparser2@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@laihoe/demoparser2@workspace:."
+  dependencies:
+    "@napi-rs/cli": ^2.16.1
+    ava: ^5.1.1
+  languageName: unknown
+  linkType: soft
+
 "@napi-rs/cli@npm:^2.16.1":
   version: 2.16.1
   resolution: "@napi-rs/cli@npm:2.16.1"
@@ -586,15 +595,6 @@ __metadata:
   checksum: a51744d9b53c164ba9c0492471a1a2ffa0b6727451bdc89e31627fdf4adda9d51277cfcbfb20f0a6f08ccb3c436f341df3e92631a3440226d93a8971724771fd
   languageName: node
   linkType: hard
-
-"demoparser2@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "demoparser2@workspace:."
-  dependencies:
-    "@napi-rs/cli": ^2.16.1
-    ava: ^5.1.1
-  languageName: unknown
-  linkType: soft
 
 "depd@npm:^2.0.0":
   version: 2.0.0

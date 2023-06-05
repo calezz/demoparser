@@ -2,22 +2,19 @@
 
 #[macro_use]
 extern crate napi_derive;
-
 use napi::bindgen_prelude::*;
 use napi::Error;
 use parser::parser_settings::rm_user_friendly_names;
 use parser::parser_settings::Parser;
 use parser::parser_settings::ParserInputs;
-use parser::read_bits::DemoParserError;
 use parser::variants::OutputSerdeHelperStruct;
-use parser::variants::Variant;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
 
 #[napi]
-pub fn parse_chat_messages(file: Option<String>) -> Result<Vec<HashMap<String, Option<String>>>> {
-  let bytes = fs::read(file.unwrap())?;
+pub fn parse_chat_messages(file: String) -> Result<Value> {
+  let bytes = fs::read(file)?;
   let settings = ParserInputs {
     bytes: &bytes,
     wanted_player_props: vec![],
@@ -62,7 +59,11 @@ pub fn parse_chat_messages(file: Option<String>) -> Result<Vec<HashMap<String, O
     hm.insert("param4".to_string(), parser.chat_messages.param4[i].clone());
     messages.push(hm);
   }
-  Ok(messages)
+  let s = match serde_json::to_value(&messages) {
+    Ok(s) => s,
+    Err(e) => return Err(Error::new(Status::InvalidArg, format!("{}", e).to_owned())),
+  };
+  Ok(s)
 }
 
 #[napi]
@@ -71,7 +72,7 @@ pub fn parse_events(
   event_name: String,
   extra_player: Option<Vec<String>>,
   extra_other: Option<Vec<String>>,
-) -> Result<String> {
+) -> Result<Value> {
   let bytes = fs::read(path)?;
 
   let player_props = match extra_player {
@@ -112,7 +113,7 @@ pub fn parse_events(
     Ok(_) => {}
     Err(e) => return Err(Error::new(Status::InvalidArg, format!("{}", e).to_owned())),
   };
-  let s = match serde_json::to_string(&parser.game_events) {
+  let s = match serde_json::to_value(&parser.game_events) {
     Ok(s) => s,
     Err(e) => return Err(Error::new(Status::InvalidArg, format!("{}", e).to_owned())),
   };
@@ -120,7 +121,7 @@ pub fn parse_events(
 }
 
 #[napi]
-pub fn parse_ticks(path: String, wanted_props: Vec<String>) -> Result<String> {
+pub fn parse_ticks(path: String, wanted_props: Vec<String>) -> Result<Value> {
   let bytes = fs::read(path)?;
   let real_names = match rm_user_friendly_names(&wanted_props) {
     Ok(names) => names,
@@ -152,7 +153,7 @@ pub fn parse_ticks(path: String, wanted_props: Vec<String>) -> Result<String> {
   let helper = OutputSerdeHelperStruct {
     inner: parser.output,
   };
-  let s = match serde_json::to_string(&helper) {
+  let s = match serde_json::to_value(&helper) {
     Ok(s) => s,
     Err(e) => return Err(Error::new(Status::InvalidArg, format!("{}", e).to_owned())),
   };
@@ -160,7 +161,7 @@ pub fn parse_ticks(path: String, wanted_props: Vec<String>) -> Result<String> {
 }
 
 #[napi]
-pub fn parse_player_info(path: String) -> Result<Vec<HashMap<String, Option<String>>>> {
+pub fn parse_player_info(path: String) -> Result<Value> {
   let bytes = fs::read(path)?;
 
   let settings = ParserInputs {
@@ -202,5 +203,9 @@ pub fn parse_player_info(path: String) -> Result<Vec<HashMap<String, Option<Stri
     hm.insert("name".to_string(), parser.player_end_data.name[i].clone());
     messages.push(hm)
   }
-  Ok(messages)
+  let s = match serde_json::to_value(&messages) {
+    Ok(s) => s,
+    Err(e) => return Err(Error::new(Status::InvalidArg, format!("{}", e).to_owned())),
+  };
+  Ok(s)
 }

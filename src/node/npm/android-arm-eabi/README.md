@@ -1,3 +1,3 @@
-# `demoparser2-android-arm-eabi`
+# `@laihoe/demoparser2-android-arm-eabi`
 
-This is the **armv7-linux-androideabi** binary for `demoparser2`
+This is the **armv7-linux-androideabi** binary for `@laihoe/demoparser2`
