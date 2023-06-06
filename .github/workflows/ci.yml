@@ -19,7 +19,7 @@ env:
 
 defaults:
   run:
-    working-directory: .src/node/
+    working-directory: ./src/node/
 
 jobs:
   build:
