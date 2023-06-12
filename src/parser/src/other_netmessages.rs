@@ -17,10 +17,8 @@ use protobuf::Message;
 
 #[derive(Debug, Clone)]
 pub struct Class {
-    pub class_id: i32,
     pub name: String,
     pub serializer: Serializer,
-    pub history: HashSet<u64>,
 }
 
 impl<'a> Parser<'a> {
@@ -33,10 +31,8 @@ impl<'a> Parser<'a> {
             let cls_id = class_t.class_id();
             let network_name = class_t.network_name();
             self.cls_by_id[cls_id as usize] = Some(Class {
-                class_id: cls_id,
                 name: network_name.to_string(),
                 serializer: self.serializers[network_name].clone(),
-                history: HashSet::default(),
             });
         }
         Ok(())

@@ -31,12 +31,12 @@ pub enum VarVec {
 impl VarVec {
     pub fn new(item: &Variant) -> Self {
         match item {
-            Variant::Bool(_) => VarVec::Bool(vec![]),
-            Variant::I32(_) => VarVec::I32(vec![]),
-            Variant::F32(_) => VarVec::F32(vec![]),
-            Variant::String(_) => VarVec::String(vec![]),
-            Variant::U64(_) => VarVec::U64(vec![]),
-            Variant::U32(_) => VarVec::U32(vec![]),
+            Variant::Bool(_) => VarVec::Bool(Vec::with_capacity(30000)),
+            Variant::I32(_) => VarVec::I32(Vec::with_capacity(30000)),
+            Variant::F32(_) => VarVec::F32(Vec::with_capacity(30000)),
+            Variant::String(_) => VarVec::String(Vec::with_capacity(30000)),
+            Variant::U64(_) => VarVec::U64(Vec::with_capacity(30000)),
+            Variant::U32(_) => VarVec::U32(Vec::with_capacity(30000)),
             _ => panic!("Tried to create propcolumns from: {:?}", item),
         }
     }

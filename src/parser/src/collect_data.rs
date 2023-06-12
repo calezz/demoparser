@@ -16,9 +16,57 @@ pub struct ProjectileRecord {
     pub tick: Option<i32>,
     pub grenade_type: Option<String>,
 }
+impl<'a> Parser<'a> {
+    pub fn collect_entities(&mut self) {
+        if !self.wanted_ticks.contains(&self.tick) && self.wanted_ticks.len() != 0 {
+            return;
+        }
+        //println!("{:?} {:?}", self.wanted_prop_ids, self.out_idx);
+        // iterate every player and every wanted prop name
+        // if either one is missing then push None to output
+        for (entity_id, player) in &self.players {
+            self.player_output_ids.push(player.id);
+            // println!("{:?}", player.name);
+            for (prop_name, idx) in self.wanted_prop_ids.iter().zip(&self.out_idx) {
+                // println!("{} {}", entity_id, prop_name);
+                // returns none if missing
+                let prop = self.get_prop_for_ent(prop_name, entity_id);
+                // println!("{:?} {:?}", prop, player);
+                self.output
+                    .entry(*idx)
+                    .or_insert_with(|| PropColumn::new())
+                    .push(prop);
+            }
+            /*
+            self.output
+                .entry(1000000)
+                .or_insert_with(|| PropColumn::new())
+                .push(Some(Variant::U64(player.steamid.unwrap())));
+            self.output
+                .entry(1000001)
+                .or_insert_with(|| PropColumn::new())
+                .push(Some(Variant::String(
+                    player.name.as_ref().unwrap().to_string(),
+                )));
+            */
+        }
+    }
+
+    pub fn get_prop_for_ent(&self, prop_id: &u32, entity_id: &i32) -> Option<Variant> {
+        // Function that allows you to use string name for the prop and the function
+        // translates it to a path. This costs a bit but the elegance of using string names
+        // is just too big to give up. Also I think paths change between demos soo...
+        //if let Some(ent) = self.entities.get(entity_id) {
+        //if let Some(prop) = ent.props.get(prop_id) {
+        //return Some(prop.clone());
+        //}
+        //}
+        None
+    }
+}
 
 // This file collects the data that is converted into a dataframe in the end in parser.parse_ticks()
-
+/*
 impl<'a> Parser<'a> {
     pub fn collect_entities(&mut self) {
         if !self.wanted_ticks.contains(&self.tick) && self.wanted_ticks.len() != 0 {
@@ -30,21 +78,21 @@ impl<'a> Parser<'a> {
         // iterate every player and every wanted prop name
         // if either one is missing then push None to output
         for (entity_id, player) in &self.players {
-            for prop_name in &self.wanted_player_props {
+            for (prop_name, idx) in self.wanted_player_props.iter().zip(&self.out_idx) {
                 // returns none if missing
                 let prop = self.find_prop(prop_name, entity_id, player);
                 self.output
-                    .entry(prop_name.to_string())
+                    .entry(*idx)
                     .or_insert_with(|| PropColumn::new())
                     .push(prop);
             }
         }
     }
-    pub fn get_prop_for_ent(&self, prop_name: &str, entity_id: &i32) -> Option<Variant> {
+    pub fn get_prop_for_ent(&self, prop_id: &u32, entity_id: &i32) -> Option<Variant> {
         // Function that allows you to use string name for the prop and the function
         // translates it to a path. This costs a bit but the elegance of using string names
         // is just too big to give up. Also I think paths change between demos soo...
-        match &self.prop_name_to_path.get(prop_name) {
+        match &self.id_to_path.get(prop_id) {
             Some(path) => {
                 if let Some(ent) = self.entities.get(entity_id) {
                     if let Some(prop) = ent.props.get(path.clone()) {
@@ -58,11 +106,13 @@ impl<'a> Parser<'a> {
     }
     pub fn find_prop(
         &self,
-        prop_name: &str,
+        prop_id: &u32,
         entity_id: &i32,
         player: &PlayerMetaData,
     ) -> Option<Variant> {
+        return self.get_prop_for_ent(prop_id, entity_id);
         // Early exit these metadata props
+        /*
         match prop_name {
             "tick" => return Some(Variant::I32(self.tick)),
             "steamid" => match player.steamid {
@@ -118,6 +168,7 @@ impl<'a> Parser<'a> {
             }
             _ => return None,
         }
+        */
         None
     }
 
@@ -306,6 +357,7 @@ impl<'a> Parser<'a> {
         None
     }
 }
+*/
 fn coord_from_cell(cell: Option<Variant>, offset: Option<Variant>) -> Option<f32> {
     // DONT KNOW IF THESE ARE CORRECT. SEEMS TO GIVE CORRECT VALUES
     let cell_bits = 9;

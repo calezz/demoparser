@@ -1,14 +1,19 @@
 use super::read_bits::{Bitreader, DemoParserError};
+use crate::collect_data::PropType;
+use crate::collect_data::TYPEHM;
 use crate::entities_utils::FieldPath;
 use crate::parser_settings::Parser;
+use crate::parser_settings::QfMapper;
 use crate::q_float::QuantalizedFloat;
 use crate::sendtables::Decoder::*;
 use crate::sendtables::FieldModel::*;
+use ahash::AHashMap;
 use ahash::HashMap;
 use csgoproto::{
     demo::CDemoSendTables,
     netmessages::{CSVCMsg_FlattenedSerializer, ProtoFlattenedSerializerField_t},
 };
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use phf_macros::phf_map;
 use protobuf::Message;
@@ -33,7 +38,29 @@ pub struct Field {
     pub decoder: Decoder,
     pub base_decoder: Option<Decoder>,
     pub child_decoder: Option<Decoder>,
+
+    pub should_parse: bool,
+    pub df_pos: usize,
+    pub is_controller_prop: bool,
+    pub controller_prop: Option<ControllerProp>,
+    pub idx: u32,
 }
+#[derive(Debug, Clone, Copy)]
+pub struct FieldInfo {
+    pub decoder: Decoder,
+    pub should_parse: bool,
+    pub df_pos: u32,
+    //pub is_controller_prop: bool,
+    pub controller_prop: Option<ControllerProp>,
+}
+#[derive(Debug, Clone, Copy)]
+pub enum ControllerProp {
+    SteamId,
+    Name,
+    TeamNum,
+    PlayerEntityId,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldModel {
     FieldModelSimple,
@@ -55,7 +82,7 @@ impl fmt::Display for Decoder {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Decoder {
-    QuantalizedFloatDecoder(QuantalizedFloat),
+    QuantalizedFloatDecoder(u8),
     VectorNormalDecoder,
     VectorNoscaleDecoder,
     VectorFloatCoordDecoder,
@@ -146,18 +173,40 @@ pub static BASETYPE_DECODERS: phf::Map<&'static str, Decoder> = phf_map! {
 };
 
 impl Field {
-    pub fn decoder_from_path(&self, path: &FieldPath, pos: usize) -> Decoder {
+    pub fn decoder_from_path(&self, path: &FieldPath, pos: usize) -> FieldInfo {
         match self.model {
             FieldModelSimple => {
-                return self.decoder;
+                return FieldInfo {
+                    decoder: self.decoder,
+                    should_parse: self.should_parse,
+                    df_pos: self.df_pos as u32,
+                    controller_prop: self.controller_prop,
+                };
             }
-            FieldModelFixedArray => self.decoder,
+            FieldModelFixedArray => {
+                return FieldInfo {
+                    decoder: self.decoder,
+                    should_parse: self.should_parse,
+                    df_pos: self.df_pos as u32,
+                    controller_prop: self.controller_prop,
+                }
+            }
             FieldModelFixedTable => {
                 if path.last == pos - 1 {
                     if self.base_decoder.is_some() {
-                        return self.base_decoder.unwrap();
+                        return FieldInfo {
+                            decoder: self.base_decoder.unwrap(),
+                            should_parse: self.should_parse,
+                            df_pos: self.df_pos as u32,
+                            controller_prop: self.controller_prop,
+                        };
                     }
-                    return self.decoder;
+                    return FieldInfo {
+                        decoder: self.decoder,
+                        should_parse: self.should_parse,
+                        df_pos: self.df_pos as u32,
+                        controller_prop: self.controller_prop,
+                    };
                 } else {
                     match &self.serializer {
                         Some(ser) => {
@@ -169,9 +218,19 @@ impl Field {
             }
             FieldModelVariableArray => {
                 if path.last == pos {
-                    return self.child_decoder.unwrap();
+                    return FieldInfo {
+                        decoder: self.child_decoder.unwrap(),
+                        should_parse: self.should_parse,
+                        df_pos: self.df_pos as u32,
+                        controller_prop: self.controller_prop,
+                    };
                 } else {
-                    return self.base_decoder.unwrap();
+                    return FieldInfo {
+                        decoder: self.base_decoder.unwrap(),
+                        should_parse: self.should_parse,
+                        df_pos: self.df_pos as u32,
+                        controller_prop: self.controller_prop,
+                    };
                 }
             }
             FieldModelVariableTable => {
@@ -183,7 +242,12 @@ impl Field {
                         None => panic!("no serializer for path"),
                     }
                 } else {
-                    return self.base_decoder.unwrap();
+                    return FieldInfo {
+                        decoder: self.base_decoder.unwrap(),
+                        should_parse: self.should_parse,
+                        df_pos: self.df_pos as u32,
+                        controller_prop: self.controller_prop,
+                    };
                 }
             }
             _ => panic!("HUH"),
@@ -201,12 +265,14 @@ impl Field {
                     full_name: prop_name + "." + &self.var_name.clone(),
                     field: Some(self.clone()),
                     decoder: self.decoder,
+                    should_parse: self.should_parse,
                 };
             }
             FieldModelFixedArray => DebugField {
                 full_name: prop_name + "." + &self.var_name.clone(),
                 field: Some(self.clone()),
                 decoder: self.decoder,
+                should_parse: self.should_parse,
             },
             FieldModelFixedTable => {
                 if path.last == pos - 1 {
@@ -215,12 +281,14 @@ impl Field {
                             full_name: prop_name + "." + &self.var_name.clone(),
                             field: Some(self.clone()),
                             decoder: self.base_decoder.unwrap(),
+                            should_parse: self.should_parse,
                         };
                     } else {
                         return DebugField {
                             full_name: prop_name + "." + &self.var_name.clone(),
                             field: Some(self.clone()),
                             decoder: self.decoder,
+                            should_parse: self.should_parse,
                         };
                     }
                 } else {
@@ -238,12 +306,14 @@ impl Field {
                         full_name: prop_name + "." + &self.var_name.clone(),
                         field: Some(self.clone()),
                         decoder: self.child_decoder.unwrap(),
+                        should_parse: self.should_parse,
                     };
                 } else {
                     return DebugField {
                         full_name: prop_name + "." + &self.var_name.clone(),
                         field: Some(self.clone()),
                         decoder: self.base_decoder.unwrap(),
+                        should_parse: self.should_parse,
                     };
                 }
             }
@@ -264,6 +334,7 @@ impl Field {
                         full_name: prop_name + "." + &self.var_name.clone(),
                         field: Some(self.clone()),
                         decoder: self.base_decoder.unwrap(),
+                        should_parse: self.should_parse,
                     };
                 }
             }
@@ -271,11 +342,11 @@ impl Field {
         }
     }
 
-    pub fn find_decoder(&mut self, model: FieldModel) {
+    pub fn find_decoder(&mut self, model: FieldModel, qf_map: &mut QfMapper) {
         self.model = model.clone();
         match model {
-            FieldModelFixedArray => self.decoder = self.match_decoder(),
-            FieldModelSimple => self.decoder = self.match_decoder(),
+            FieldModelFixedArray => self.decoder = self.match_decoder(qf_map),
+            FieldModelSimple => self.decoder = self.match_decoder(qf_map),
             FieldModelFixedTable => self.decoder = Decoder::BooleanDecoder,
             FieldModelVariableTable => self.base_decoder = Some(Decoder::UnsignedDecoder),
             FieldModelVariableArray => {
@@ -301,21 +372,21 @@ impl Field {
             FieldModelNOTSET => panic!("Field model not set??"),
         }
     }
-    pub fn match_decoder(&self) -> Decoder {
+    pub fn match_decoder(&self, qf_map: &mut QfMapper) -> Decoder {
         if self.var_name == "m_iClip1" {
             return Decoder::AmmoDecoder;
         }
         let dec = match BASETYPE_DECODERS.get(&self.field_type.base_type) {
             Some(decoder) => decoder.clone(),
             None => match self.field_type.base_type.as_str() {
-                "float32" => self.find_float_type(),
-                "Vector" => self.find_vector_type(3),
-                "Vector2D" => self.find_vector_type(2),
-                "Vector4D" => self.find_vector_type(4),
+                "float32" => self.find_float_type(qf_map),
+                "Vector" => self.find_vector_type(3, qf_map),
+                "Vector2D" => self.find_vector_type(2, qf_map),
+                "Vector4D" => self.find_vector_type(4, qf_map),
                 "uint64" => self.find_uint_type(),
                 "QAngle" => self.find_qangle_type(),
                 "CHandle" => UnsignedDecoder,
-                "CNetworkedQuantizedFloat" => self.find_float_type(),
+                "CNetworkedQuantizedFloat" => self.find_float_type(qf_map),
                 "CStrongHandle" => self.find_uint_type(),
                 "CEntityHandle" => self.find_uint_type(),
                 _ => Decoder::UnsignedDecoder,
@@ -335,7 +406,7 @@ impl Field {
             }
         }
     }
-    pub fn find_float_type(&self) -> Decoder {
+    pub fn find_float_type(&self, qf_map: &mut QfMapper) -> Decoder {
         match self.var_name.as_str() {
             "m_flSimulationTime" => return Decoder::FloatSimulationTimeDecoder,
             "m_flAnimTime" => return Decoder::FloatSimulationTimeDecoder,
@@ -348,13 +419,17 @@ impl Field {
                 if self.bitcount <= 0 || self.bitcount >= 32 {
                     return Decoder::NoscaleDecoder;
                 } else {
+                    println!("{:?} {}", self.encoder, self.var_name);
                     let qf = QuantalizedFloat::new(
                         self.bitcount.try_into().unwrap(),
                         Some(self.encode_flags),
                         Some(self.low_value),
                         Some(self.high_value),
                     );
-                    return Decoder::QuantalizedFloatDecoder(qf);
+                    let idx = qf_map.idx;
+                    qf_map.map.insert(idx, qf);
+                    qf_map.idx += 1;
+                    return Decoder::QuantalizedFloatDecoder(idx as u8);
                 }
             }
         }
@@ -365,11 +440,11 @@ impl Field {
             _ => Decoder::Unsigned64Decoder,
         }
     }
-    pub fn find_vector_type(&self, n: u32) -> Decoder {
+    pub fn find_vector_type(&self, n: u32, qf_map: &mut QfMapper) -> Decoder {
         if n == 3 && self.encoder == "normal" {
             return Decoder::VectorNormalDecoder;
         }
-        let float_type = self.find_float_type();
+        let float_type = self.find_float_type(qf_map);
         match float_type {
             NoscaleDecoder => return VectorNoscaleDecoder,
             FloatCoordDecoder => return VectorFloatCoordDecoder,
@@ -436,10 +511,8 @@ pub struct Serializer {
 }
 
 impl Serializer {
-    pub fn find_decoder(&self, path: &FieldPath, pos: usize) -> Decoder {
-        let idx = path.path[pos];
-        let f = &self.fields[idx as usize];
-        f.decoder_from_path(path, pos + 1)
+    pub fn find_decoder(&self, path: &FieldPath, pos: usize) -> FieldInfo {
+        self.fields[path.path[pos] as usize].decoder_from_path(path, pos + 1)
     }
     pub fn debug_find_decoder(
         &self,
@@ -516,22 +589,22 @@ impl<'a> Parser<'a> {
                                 if field.field_type.pointer
                                     || POINTER_TYPES.contains(&field.field_type.base_type.as_str())
                                 {
-                                    field.find_decoder(FieldModelFixedTable)
+                                    field.find_decoder(FieldModelFixedTable, &mut self.qf_map)
                                 } else {
-                                    field.find_decoder(FieldModelVariableTable)
+                                    field.find_decoder(FieldModelVariableTable, &mut self.qf_map)
                                 }
                             }
                             None => {
                                 if field.field_type.count > 0
                                     && field.field_type.base_type != "char"
                                 {
-                                    field.find_decoder(FieldModelFixedArray)
+                                    field.find_decoder(FieldModelFixedArray, &mut self.qf_map)
                                 } else if field.field_type.base_type == "CUtlVector"
                                     || field.field_type.base_type == "CNetworkUtlVectorBase"
                                 {
-                                    field.find_decoder(FieldModelVariableArray)
+                                    field.find_decoder(FieldModelVariableArray, &mut self.qf_map)
                                 } else {
-                                    field.find_decoder(FieldModelSimple)
+                                    field.find_decoder(FieldModelSimple, &mut self.qf_map)
                                 }
                             }
                         }
@@ -540,24 +613,24 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            self.find_prop_name_paths(&my_serializer);
+            self.find_prop_name_paths(&mut my_serializer);
 
             self.serializers
                 .insert(my_serializer.name.clone(), my_serializer);
         }
         Ok(())
     }
-    pub fn find_prop_name_paths(&mut self, ser: &Serializer) {
+    pub fn find_prop_name_paths(&mut self, ser: &mut Serializer) {
         // Finds mapping from name to path.
         // Example: "m_iHealth" => [4, 0, 0, 0, 0, 0, 0]
-        self.traverse_fields(&ser.fields, vec![], ser.name.clone())
+        self.traverse_fields(&mut ser.fields, vec![], ser.name.clone())
     }
-    pub fn traverse_fields(&mut self, fields: &Vec<Field>, path: Vec<i32>, ser_name: String) {
-        for (idx, f) in fields.iter().enumerate() {
-            if let Some(ser) = &f.serializer {
+    pub fn traverse_fields(&mut self, fields: &mut Vec<Field>, path: Vec<i32>, ser_name: String) {
+        for (idx, f) in fields.iter_mut().enumerate() {
+            if let Some(ser) = &mut f.serializer {
                 let mut tmp = path.clone();
                 tmp.push(idx as i32);
-                self.traverse_fields(&ser.fields, tmp, ser_name.clone() + "." + &ser.name)
+                self.traverse_fields(&mut ser.fields, tmp, ser_name.clone() + "." + &ser.name)
             } else {
                 let mut tmp = path.clone();
                 tmp.push(idx as i32);
@@ -567,24 +640,78 @@ impl<'a> Parser<'a> {
                     arr[idx] = *val;
                 }
                 let full_name = ser_name.clone() + "." + &f.var_name;
-
-                if self.wanted_player_props.contains(&full_name)
-                    || full_name.contains("cell")
-                    || full_name.contains("m_vec")
-                    || full_name.contains("Weapon")
-                    || full_name.contains("CAK47")
-                {
-                    self.wanted_prop_paths.insert(arr);
+                if full_name.contains("m_hActiveWeapon") {
+                    println!("{} {:?}", full_name, arr);
                 }
+                if self.is_wanted_prop(&full_name) {
+                    f.should_parse = true;
+                    self.wanted_prop_paths.insert(arr);
+                    if full_name.contains("Controller") {
+                        f.is_controller_prop = true;
+                        f.controller_prop = self.find_controller_prop_type(&full_name);
+                    }
+                    f.df_pos = self.id as usize;
+                }
+                if self.wanted_player_props.contains(&full_name) {
+                    self.wanted_prop_ids.push(self.id);
+                }
+                match full_name.as_str() {
+                    "CCSPlayerController.m_iTeamNum" => self.controller_ids.teamnum = Some(self.id),
+                    "CCSPlayerController.m_iszPlayerName" => {
+                        self.controller_ids.player_name = Some(self.id)
+                    }
+                    "CCSPlayerController.m_steamID" => self.controller_ids.steamid = Some(self.id),
+                    "CCSPlayerController.m_hPlayerPawn" => {
+                        self.controller_ids.player_pawn = Some(self.id)
+                    }
+                    _ => {}
+                };
 
+                self.id_to_path.insert(self.id, arr);
+                self.id += 1;
                 self.prop_name_to_path.insert(full_name.clone(), arr);
                 self.path_to_prop_name.insert(arr, full_name);
-                self.prop_name_to_path.insert(
-                    "CCSPlayerPawn.m_pWeaponServices.m_hActiveWeapon".to_owned(),
-                    [86, 1, 0, 0, 0, 0, 0],
-                );
             }
         }
+    }
+    fn find_controller_prop_type(&self, name: &str) -> Option<ControllerProp> {
+        match name {
+            "CCSPlayerController.m_iTeamNum" => Some(ControllerProp::TeamNum),
+            "CCSPlayerController.m_iszPlayerName" => Some(ControllerProp::Name),
+            "CCSPlayerController.m_steamID" => Some(ControllerProp::SteamId),
+            "CCSPlayerController.m_hPlayerPawn" => Some(ControllerProp::PlayerEntityId),
+            _ => None,
+        }
+    }
+    fn is_wanted_prop(&self, name: &str) -> bool {
+        if self.wanted_player_props.contains(&"X".to_string())
+            || self.wanted_player_props.contains(&"Y".to_string())
+            || self.wanted_player_props.contains(&"Z".to_string())
+        {
+            if name.contains("cell") || name.contains("m_vec") {
+                return true;
+            }
+        }
+        let temp = name.split(".").collect_vec();
+        let weap_prop_part = temp.last().unwrap_or(&"Whatever");
+        match TYPEHM.get(weap_prop_part) {
+            Some(PropType::Weapon) => return true,
+            _ => {}
+        };
+        if name.contains("CCSTeam.m_iTeamNum")
+            || name.contains("CCSPlayerController.m_iTeamNum")
+            || name.contains("CCSPlayerController.m_iszPlayerName")
+            || name.contains("CCSPlayerController.m_steamID")
+            || name.contains("CCSPlayerController.m_hPlayerPawn")
+            || name.contains("CCSPlayerController.m_bPawnIsAlive")
+            || name.contains("m_hActiveWeapon")
+        {
+            return true;
+        }
+        if self.wanted_player_props.contains(&name.to_owned()) {
+            return true;
+        }
+        false
     }
 }
 
@@ -593,6 +720,7 @@ pub struct DebugField {
     pub full_name: String,
     pub field: Option<Field>,
     pub decoder: Decoder,
+    pub should_parse: bool,
 }
 
 fn field_from_msg(
@@ -625,6 +753,11 @@ fn field_from_msg(
         decoder: BaseDecoder,
         base_decoder: None,
         child_decoder: None,
+        should_parse: false,
+        df_pos: 0,
+        is_controller_prop: false,
+        controller_prop: None,
+        idx: 0,
     };
     f
 }

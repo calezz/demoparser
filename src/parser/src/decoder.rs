@@ -3,16 +3,23 @@ use super::{
     sendtables::Decoder,
     variants::Variant,
 };
-use crate::sendtables::Decoder::*;
+use crate::{parser_settings::QfMapper, sendtables::Decoder::*};
 
 impl<'a> Bitreader<'a> {
     #[inline(always)]
-    pub fn decode(&mut self, decoder: &Decoder) -> Result<Variant, DemoParserError> {
+    pub fn decode(
+        &mut self,
+        decoder: &Decoder,
+        qf_map: &QfMapper,
+    ) -> Result<Variant, DemoParserError> {
         match decoder {
             NoscaleDecoder => Ok(Variant::F32(f32::from_bits(self.read_nbits(32)?))),
             FloatSimulationTimeDecoder => Ok(Variant::F32(self.decode_simul_time()?)),
             UnsignedDecoder => Ok(Variant::U32(self.read_varint()?)),
-            QuantalizedFloatDecoder(qf) => Ok(Variant::F32(qf.clone().decode(self))),
+            QuantalizedFloatDecoder(qf_idx) => {
+                let mut qf = qf_map.map[&((*qf_idx) as u32)];
+                Ok(Variant::F32(qf.decode(self)))
+            }
             Qangle3Decoder => Ok(Variant::VecXYZ(self.decode_qangle_all_3()?)),
             SignedDecoder => Ok(Variant::I32(self.read_varint32()?)),
             VectorNoscaleDecoder => Ok(Variant::FloatVec32(self.decode_vector_noscale()?)),
@@ -33,7 +40,6 @@ impl<'a> Bitreader<'a> {
             _ => panic!("huh {:?}", decoder),
         }
     }
-
     pub fn decode_vector_float_coord(&mut self) -> Result<Vec<f32>, DemoParserError> {
         let mut v = vec![];
         for _ in 0..3 {

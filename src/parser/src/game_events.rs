@@ -22,7 +22,7 @@ static INTERNALEVENTFIELDS: &'static [&str] = &[
     "assister_pawn",
 ];
 const ENTITYIDNONE: i32 = 2047;
-
+/*
 impl<'a> Parser<'a> {
     // Message that should come before first game event
     pub fn parse_game_event_list(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
@@ -302,4 +302,16 @@ impl Serialize for EventField {
         map.serialize_entry(&self.name, &self.data).unwrap();
         map.end()
     }
+}
+*/
+#[derive(Debug, Clone)]
+pub struct EventField {
+    pub name: String,
+    pub data: Option<Variant>,
+}
+#[derive(Debug, Clone)]
+pub struct GameEvent {
+    pub name: String,
+    pub fields: Vec<EventField>,
+    pub tick: i32,
 }

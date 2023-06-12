@@ -5,10 +5,7 @@ use std::fs;
 use std::time::Instant;
 
 fn main() {
-    let wanted_props = vec![
-        "CCSPlayerController.m_iPawnHealth".to_owned(),
-        "m_iClip1".to_owned(),
-    ];
+    let wanted_props = vec!["CCSPlayerPawn.m_bSpotted".to_owned()];
     let demo_path = "/home/laiho/Documents/demos/cs2/s2.dem";
     let bytes = fs::read(demo_path).unwrap();
 
@@ -34,8 +31,14 @@ fn main() {
         count_props: false,
         only_convars: false,
     };
+    let before = Instant::now();
     let mut parser = Parser::new(settings).unwrap();
     parser.start().unwrap();
+    println!("{:2?}", before.elapsed());
+    println!("{}", parser.qf_map.idx);
+    // println!("{:?}", parser.qf_map.map);
 
-    let x = &parser.output["CCSPlayerController.m_iPawnHealth"];
+    // IDS NEED TO BE UNIQ FOR PLAYER
+    // println!("{:?}", parser.player_output_ids);
+    // let x = &parser.output["CCSPlayerController.m_iPawnHealth"];
 }

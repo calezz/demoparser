@@ -48,7 +48,7 @@ impl<'a> Parser<'a> {
                 _ => Ok(()),
             };
             ok?;
-            self.collect_entities();
+            //self.collect_entities();
         }
         Ok(())
     }
@@ -68,8 +68,8 @@ impl<'a> Parser<'a> {
                 svc_ServerInfo => self.parse_server_info(&msg_bytes),
                 svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
                 svc_UpdateStringTable => self.update_string_table(&msg_bytes),
-                GE_Source1LegacyGameEventList => self.parse_game_event_list(&msg_bytes),
-                GE_Source1LegacyGameEvent => self.parse_event(&msg_bytes),
+                //GE_Source1LegacyGameEventList => self.parse_game_event_list(&msg_bytes),
+                //GE_Source1LegacyGameEvent => self.parse_event(&msg_bytes),
                 CS_UM_SendPlayerItemDrops => self.parse_item_drops(&msg_bytes),
                 CS_UM_EndOfMatchAllPlayersData => self.parse_player_end_msg(&msg_bytes),
                 UM_SayText2 => self.parse_chat_messages(&msg_bytes),
@@ -77,7 +77,8 @@ impl<'a> Parser<'a> {
                 CS_UM_PlayerStatsUpdate => self.parse_player_stats_update(&msg_bytes),
                 _ => Ok(()),
             };
-            ok?
+            ok?;
+            // self.collect_entities();
         }
         Ok(())
     }
