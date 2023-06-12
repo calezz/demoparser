@@ -20,10 +20,11 @@ use csgoproto::netmessages::csvcmsg_game_event_list::Descriptor_t;
 use phf_macros::phf_map;
 use soa_derive::StructOfArray;
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 // Wont fit in L1, evaluate if worth to use pointer method
 const HUF_LOOKUPTABLE_MAXVALUE: u32 = (1 << 17) - 1;
-
+#[derive(Debug, Clone)]
 pub struct QfMapper {
     pub idx: u32,
     pub map: AHashMap<u32, QuantalizedFloat>,
@@ -32,6 +33,7 @@ pub struct QfMapper {
 pub struct Parser<'a> {
     pub ptr: usize,
     pub bytes: &'a [u8],
+    pub huffman_lookup_table: &'a Vec<(u32, u8)>,
     // Parsing state
     pub ge_list: Option<AHashMap<i32, Descriptor_t>>,
     pub serializers: AHashMap<String, Serializer, RandomState>,
@@ -45,13 +47,12 @@ pub struct Parser<'a> {
     pub path_to_prop_name: AHashMap<[i32; 7], String>,
     pub wanted_prop_paths: AHashSet<[i32; 7]>,
     pub id_to_path: AHashMap<u32, [i32; 7]>,
-    pub huffman_lookup_table: [i32; HUF_LOOKUPTABLE_MAXVALUE as usize],
     pub game_events: Vec<GameEvent>,
     pub string_tables: Vec<StringTable>,
     pub rules_entity_id: Option<i32>,
     pub game_events_counter: AHashMap<String, i32>,
     pub baselines: AHashMap<u32, Vec<u8>, RandomState>,
-    pub paths: [FieldInfo; 2048],
+    pub paths: [FieldInfo; 4096],
     pub projectiles: AHashSet<i32, RandomState>,
     pub id: u32,
     pub wanted_prop_ids: Vec<u32>,
@@ -60,6 +61,7 @@ pub struct Parser<'a> {
     pub prop_out_id: u8,
     pub qf_map: QfMapper,
     pub cls_from_entid: [u32; 2048],
+    pub start: Instant,
 
     // Output from parsing
     pub output: AHashMap<u32, PropColumn, RandomState>,
@@ -83,6 +85,62 @@ pub struct Parser<'a> {
     pub parse_entities: bool,
     pub parse_projectiles: bool,
 }
+pub struct Parser2<'a> {
+    pub ptr: usize,
+    pub bytes: &'a [u8],
+    pub huffman_lookup_table: &'a Vec<(u32, u8)>,
+    // Parsing state
+    pub ge_list: Option<AHashMap<i32, Descriptor_t>>,
+    pub serializers: AHashMap<String, Serializer, RandomState>,
+    pub cls_by_id: &'a [Option<Class>; 560],
+    pub cls_bits: Option<u32>,
+    pub entities: [Option<Entity>; 2048],
+    pub tick: i32,
+    pub players: BTreeMap<i32, PlayerMetaData>,
+    pub teams: Teams,
+    pub prop_name_to_path: AHashMap<String, [i32; 7]>,
+    pub path_to_prop_name: AHashMap<[i32; 7], String>,
+    pub wanted_prop_paths: AHashSet<[i32; 7]>,
+    pub id_to_path: AHashMap<u32, [i32; 7]>,
+    pub game_events: Vec<GameEvent>,
+    pub string_tables: Vec<StringTable>,
+    pub rules_entity_id: Option<i32>,
+    pub game_events_counter: AHashMap<String, i32>,
+    pub baselines: AHashMap<u32, Vec<u8>, RandomState>,
+    pub paths: [FieldInfo; 4096],
+    pub projectiles: AHashSet<i32, RandomState>,
+    pub id: u32,
+    pub wanted_prop_ids: Vec<u32>,
+    pub controller_ids: ControllerIDS,
+    pub player_output_ids: Vec<u8>,
+    pub prop_out_id: u8,
+    pub qf_map: QfMapper,
+    pub cls_from_entid: [u32; 2048],
+    pub start: Instant,
+
+    // Output from parsing
+    pub output: AHashMap<u32, PropColumn, RandomState>,
+    pub header: HashMap<String, String>,
+    pub skins: EconItemVec,
+    pub item_drops: EconItemVec,
+    pub convars: AHashMap<String, String>,
+    pub chat_messages: ChatMessageRecordVec,
+    pub player_end_data: PlayerEndDataVec,
+    pub projectile_records: ProjectileRecordVec,
+
+    // Settings
+    pub wanted_ticks: AHashSet<i32, RandomState>,
+    pub wanted_player_props: Vec<String>,
+    pub out_idx: Vec<u32>,
+    pub wanted_player_props_og_names: Vec<String>,
+    // Team and rules props
+    pub wanted_other_props: Vec<String>,
+    pub wanted_other_props_og_names: Vec<String>,
+    pub wanted_event: Option<String>,
+    pub parse_entities: bool,
+    pub parse_projectiles: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Teams {
     pub team1_entid: Option<i32>,
@@ -99,7 +157,7 @@ impl Teams {
     }
 }
 
-#[derive(Debug, StructOfArray)]
+#[derive(Debug, StructOfArray, Clone)]
 pub struct ChatMessageRecord {
     pub entity_idx: Option<i32>,
     pub param1: Option<String>,
@@ -107,7 +165,7 @@ pub struct ChatMessageRecord {
     pub param3: Option<String>,
     pub param4: Option<String>,
 }
-#[derive(Debug, StructOfArray)]
+#[derive(Debug, StructOfArray, Clone)]
 pub struct EconItem {
     pub account_id: Option<u32>,
     pub item_id: Option<u64>,
@@ -124,14 +182,14 @@ pub struct EconItem {
     pub ent_idx: Option<i32>,
     pub steamid: Option<u64>,
 }
-#[derive(Debug, StructOfArray)]
+#[derive(Debug, StructOfArray, Clone)]
 pub struct PlayerEndData {
     pub steamid: Option<u64>,
     pub name: Option<String>,
     pub team_number: Option<i32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParserInputs<'a> {
     pub bytes: &'a [u8],
 
@@ -147,8 +205,27 @@ pub struct ParserInputs<'a> {
     pub only_header: bool,
     pub count_props: bool,
     pub only_convars: bool,
+    pub huf: &'a Vec<(u32, u8)>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct ParserInputs2<'a> {
+    pub bytes: &'a [u8],
+    pub cls_by_id: &'a [Option<Class>; 560],
+    pub wanted_player_props: Vec<String>,
+    pub wanted_player_props_og_names: Vec<String>,
+    pub wanted_other_props: Vec<String>,
+    pub wanted_other_props_og_names: Vec<String>,
+
+    pub wanted_ticks: Vec<i32>,
+    pub wanted_event: Option<String>,
+    pub parse_ents: bool,
+    pub parse_projectiles: bool,
+    pub only_header: bool,
+    pub count_props: bool,
+    pub only_convars: bool,
+    pub huf: &'a Vec<(u32, u8)>,
+}
+#[derive(Debug, Clone)]
 pub struct ControllerIDS {
     pub teamnum: Option<u32>,
     pub player_name: Option<u32>,
@@ -163,7 +240,6 @@ impl<'a> Parser<'a> {
             "steamid".to_owned(),
             "name".to_owned(),
         ]);
-        let huffman_table = create_huffman_lookup_table();
         Ok(Parser {
             serializers: AHashMap::default(),
             ptr: 0,
@@ -397,7 +473,7 @@ impl<'a> Parser<'a> {
                 should_parse: false,
                 df_pos: 0,
                 controller_prop: None,
-            }; 2048],
+            }; 4096],
             teams: Teams::new(),
             game_events_counter: AHashMap::default(),
             parse_projectiles: settings.parse_projectiles,
@@ -407,7 +483,7 @@ impl<'a> Parser<'a> {
             item_drops: EconItemVec::new(),
             skins: EconItemVec::new(),
             player_end_data: PlayerEndDataVec::new(),
-            huffman_lookup_table: huffman_table,
+            huffman_lookup_table: settings.huf,
             prop_name_to_path: AHashMap::default(),
             wanted_prop_paths: AHashSet::default(),
             path_to_prop_name: AHashMap::default(),
@@ -421,6 +497,234 @@ impl<'a> Parser<'a> {
                 .enumerate()
                 .map(|(x, _)| x as u32)
                 .collect(),
+            start: Instant::now(),
+        })
+    }
+}
+impl<'a> Parser2<'a> {
+    pub fn new(mut settings: ParserInputs2<'a>) -> Result<Self, DemoParserError> {
+        settings.wanted_player_props.extend(vec![
+            "tick".to_owned(),
+            "steamid".to_owned(),
+            "name".to_owned(),
+        ]);
+        Ok(Parser2 {
+            serializers: AHashMap::default(),
+            ptr: 0,
+            ge_list: None,
+            bytes: settings.bytes,
+            id_to_path: AHashMap::default(),
+            id: 0,
+            player_output_ids: vec![],
+            wanted_prop_ids: vec![],
+            prop_out_id: 0,
+            //qf_map: AHashMap::default(),
+            qf_map: QfMapper {
+                idx: 0,
+                map: AHashMap::default(),
+            },
+            cls_from_entid: [0; 2048],
+            controller_ids: ControllerIDS {
+                teamnum: None,
+                player_name: None,
+                steamid: None,
+                player_pawn: None,
+            },
+            // JUST LOL
+            cls_by_id: settings.cls_by_id,
+            entities: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None,
+            ],
+            cls_bits: None,
+            tick: -99999,
+            wanted_player_props: settings.wanted_player_props.clone(),
+            players: BTreeMap::default(),
+            output: AHashMap::default(),
+            wanted_ticks: AHashSet::from_iter(settings.wanted_ticks),
+            game_events: vec![],
+            wanted_event: settings.wanted_event,
+            parse_entities: settings.parse_ents,
+            projectiles: AHashSet::default(),
+            projectile_records: ProjectileRecordVec::new(),
+            baselines: AHashMap::default(),
+            string_tables: vec![],
+
+            paths: [FieldInfo {
+                decoder: NoscaleDecoder,
+                should_parse: false,
+                df_pos: 0,
+                controller_prop: None,
+            }; 4096],
+            teams: Teams::new(),
+            game_events_counter: AHashMap::default(),
+            parse_projectiles: settings.parse_projectiles,
+            rules_entity_id: None,
+            convars: AHashMap::default(),
+            chat_messages: ChatMessageRecordVec::new(),
+            item_drops: EconItemVec::new(),
+            skins: EconItemVec::new(),
+            player_end_data: PlayerEndDataVec::new(),
+            huffman_lookup_table: settings.huf,
+            prop_name_to_path: AHashMap::default(),
+            wanted_prop_paths: AHashSet::default(),
+            path_to_prop_name: AHashMap::default(),
+            header: HashMap::default(),
+            wanted_player_props_og_names: settings.wanted_player_props_og_names,
+            wanted_other_props: settings.wanted_other_props,
+            wanted_other_props_og_names: settings.wanted_other_props_og_names,
+            out_idx: settings
+                .wanted_player_props
+                .iter()
+                .enumerate()
+                .map(|(x, _)| x as u32)
+                .collect(),
+            start: Instant::now(),
         })
     }
 }
@@ -434,7 +738,7 @@ fn msb(mut val: u32) -> u32 {
     cnt
 }
 
-fn create_huffman_lookup_table() -> [i32; HUF_LOOKUPTABLE_MAXVALUE as usize] {
+pub fn create_huffman_lookup_table() -> Vec<(u32, u8)> {
     let mut huffman_table = vec![(999999, 255); HUF_LOOKUPTABLE_MAXVALUE as usize];
     let mut huffman_rev_table = vec![(999999, 255); HUF_LOOKUPTABLE_MAXVALUE as usize];
 
@@ -509,21 +813,7 @@ fn create_huffman_lookup_table() -> [i32; HUF_LOOKUPTABLE_MAXVALUE as usize] {
             huffman_rev_table[p as usize] = (0, 1);
         }
     }
-    let mut t = [0; HUF_LOOKUPTABLE_MAXVALUE as usize]; // Vec::with_capacity(HUF_LOOKUPTABLE_MAXVALUE as usize);
-    for (idx, (a, b)) in huffman_rev_table.iter().enumerate() {
-        let y = a << 8;
-        /*
-        println!(
-            "{:#032b} {:#032b} <<8: {:#032b} y|b: {:#032b}",
-            a,
-            b,
-            y,
-            y | b
-        );
-        */
-        t[idx] = y | b;
-    }
-    t
+    huffman_rev_table
 }
 
 pub fn rm_user_friendly_names(names: &Vec<String>) -> Result<Vec<String>, DemoParserError> {

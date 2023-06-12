@@ -205,8 +205,6 @@ impl QuantalizedFloat {
                 qf.flags &= !QFF_ENCODE_ZERO;
             }
         }
-        println!("{:?}", qf);
-
         qf
     }
 }

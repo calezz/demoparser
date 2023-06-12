@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
     ) -> Result<(), DemoParserError> {
         let n_updated_values = self.decode_entity_update(bitreader, entity_id)?;
         if n_updated_values > 0 {
-            self.gather_extra_info(&entity_id)?;
+            // self.gather_extra_info(&entity_id)?;
         }
         Ok(())
     }
@@ -111,7 +111,6 @@ impl<'a> Parser<'a> {
         };
 
         for field_info in &self.paths[..n_paths] {
-            //let field_info = class.serializer.find_decoder(&path, 0);
             let result = bitreader.decode(&field_info.decoder, &self.qf_map)?;
             if field_info.should_parse {
                 entity.props.insert(field_info.df_pos as u32, result);
@@ -192,8 +191,11 @@ impl<'a> Parser<'a> {
         the way it was done in source 1 demos?
         */
 
-        let class = match self.cls_by_id[self.cls_from_entid[*entity_id as usize] as usize].as_ref()
-        {
+        let entity = match &self.entities[*entity_id as usize] {
+            Some(ent) => ent,
+            None => return Err(DemoParserError::EntityNotFound),
+        };
+        let class = match self.cls_by_id[entity.cls_id as usize].as_ref() {
             Some(cls) => cls,
             None => return Err(DemoParserError::ClassNotFound),
         };
@@ -210,10 +212,7 @@ impl<'a> Parser<'a> {
         loop {
             bitreader.reader.refill_lookahead();
             let peeked_bits = bitreader.reader.peek(HUFFMAN_CODE_MAXLEN) as usize;
-            let temp = self.huffman_lookup_table[peeked_bits];
-            let code_len = temp & 0b11111111;
-            let symbol = (temp >> 8) as u32;
-
+            let (symbol, code_len) = self.huffman_lookup_table[peeked_bits];
             bitreader.reader.consume(code_len as u32);
 
             if symbol == STOP_READING_SYMBOL {
@@ -294,18 +293,20 @@ impl<'a> Parser<'a> {
         };
         match player_entid {
             Some(e) => {
-                self.players.insert(
-                    e,
-                    PlayerMetaData {
-                        name: name,
-                        team_num: team_num,
-                        player_entity_id: player_entid,
-                        steamid: steamid,
-                        controller_entid: Some(*entity_id),
-                        id: self.prop_out_id,
-                    },
-                );
-                self.prop_out_id += 1;
+                if e != 2047 {
+                    self.players.insert(
+                        e,
+                        PlayerMetaData {
+                            name: name,
+                            team_num: team_num,
+                            player_entity_id: player_entid,
+                            steamid: steamid,
+                            controller_entid: Some(*entity_id),
+                            id: *entity_id as u8,
+                        },
+                    );
+                    self.prop_out_id += 1;
+                }
             }
             _ => {}
         }
@@ -317,7 +318,7 @@ impl<'a> Parser<'a> {
         bitreader: &mut Bitreader,
         entity_id: &i32,
     ) -> Result<(), DemoParserError> {
-        let cls_id: u32 = bitreader.read_nbits(self.cls_bits.unwrap())?;
+        let cls_id: u32 = bitreader.read_nbits(8)?;
 
         self.cls_from_entid[*entity_id as usize] = cls_id;
 

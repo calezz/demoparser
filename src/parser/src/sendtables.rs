@@ -9,6 +9,7 @@ use crate::sendtables::Decoder::*;
 use crate::sendtables::FieldModel::*;
 use ahash::AHashMap;
 use ahash::HashMap;
+use csgoproto::netmessages::ProtoFlattenedSerializer_t;
 use csgoproto::{
     demo::CDemoSendTables,
     netmessages::{CSVCMsg_FlattenedSerializer, ProtoFlattenedSerializerField_t},
@@ -120,9 +121,6 @@ pub static BASETYPE_DECODERS: phf::Map<&'static str, Decoder> = phf_map! {
     "uint32" =>  UnsignedDecoder,
     "uint8" =>   UnsignedDecoder,
     "color32" => UnsignedDecoder,
-
-    // "float32" => NoscaleDecoder,
-    // "Vector" => VectorDecoder,
 
     "GameTime_t" => NoscaleDecoder,
     "CBodyComponent" =>       ComponentDecoder,
@@ -419,7 +417,6 @@ impl Field {
                 if self.bitcount <= 0 || self.bitcount >= 32 {
                     return Decoder::NoscaleDecoder;
                 } else {
-                    println!("{:?} {}", self.encoder, self.var_name);
                     let qf = QuantalizedFloat::new(
                         self.bitcount.try_into().unwrap(),
                         Some(self.encode_flags),
@@ -554,6 +551,9 @@ impl<'a> Parser<'a> {
     // This part is so insanely complicated. There are multiple versions of each serializer and
     // each serializer is this huge nested struct.
     pub fn parse_sendtable(&mut self, tables: CDemoSendTables) -> Result<(), DemoParserError> {
+        use std::time::Instant;
+
+        let before = Instant::now();
         let mut bitreader = Bitreader::new(tables.data());
         let n_bytes = bitreader.read_varint()?;
 
@@ -562,11 +562,12 @@ impl<'a> Parser<'a> {
             Message::parse_from_bytes(&bytes).unwrap();
 
         let mut fields: HashMap<i32, Field> = HashMap::default();
-        for serializer in &serializer_msg.serializers {
+        for (ii, serializer) in serializer_msg.serializers.iter().enumerate() {
             let mut my_serializer = Serializer {
                 name: serializer_msg.symbols[serializer.serializer_name_sym() as usize].clone(),
                 fields: vec![],
             };
+            fields.clear();
 
             for idx in &serializer.fields_index {
                 match fields.get(idx) {
@@ -613,13 +614,74 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            self.find_prop_name_paths(&mut my_serializer);
 
+            // self.find_prop_name_paths(&mut my_serializer);
             self.serializers
                 .insert(my_serializer.name.clone(), my_serializer);
         }
+        println!("{:2?}", self.start.elapsed());
+        println!("T {:2?}", before.elapsed());
+
+        //panic!("done");
         Ok(())
     }
+    /*
+    pub fn x(
+        &self,
+        serializer: &ProtoFlattenedSerializer_t,
+        serializer_msg: &CSVCMsg_FlattenedSerializer,
+    ) {
+        let mut my_serializer = Serializer {
+            name: serializer_msg.symbols[serializer.serializer_name_sym() as usize].clone(),
+            fields: vec![],
+        };
+
+        for idx in &serializer.fields_index {
+            match fields.get(idx) {
+                Some(field) => my_serializer.fields.push(field.clone()),
+                None => {
+                    let field_msg = &serializer_msg.fields[*idx as usize];
+                    let mut field = field_from_msg(field_msg, &serializer_msg);
+                    match &field.serializer_name {
+                        Some(name) => match self.serializers.get(name) {
+                            Some(ser) => {
+                                field.serializer = Some(ser.clone());
+                            }
+                            None => {}
+                        },
+                        None => {}
+                    }
+
+                    match &field.serializer {
+                        Some(_) => {
+                            if field.field_type.pointer
+                                || POINTER_TYPES.contains(&field.field_type.base_type.as_str())
+                            {
+                                field.find_decoder(FieldModelFixedTable, &mut self.qf_map)
+                            } else {
+                                field.find_decoder(FieldModelVariableTable, &mut self.qf_map)
+                            }
+                        }
+                        None => {
+                            if field.field_type.count > 0 && field.field_type.base_type != "char" {
+                                field.find_decoder(FieldModelFixedArray, &mut self.qf_map)
+                            } else if field.field_type.base_type == "CUtlVector"
+                                || field.field_type.base_type == "CNetworkUtlVectorBase"
+                            {
+                                field.find_decoder(FieldModelVariableArray, &mut self.qf_map)
+                            } else {
+                                field.find_decoder(FieldModelSimple, &mut self.qf_map)
+                            }
+                        }
+                    }
+                    fields.insert(*idx, field.clone());
+                    my_serializer.fields.push(field);
+                }
+            }
+        }
+    }
+    */
+
     pub fn find_prop_name_paths(&mut self, ser: &mut Serializer) {
         // Finds mapping from name to path.
         // Example: "m_iHealth" => [4, 0, 0, 0, 0, 0, 0]
@@ -640,9 +702,7 @@ impl<'a> Parser<'a> {
                     arr[idx] = *val;
                 }
                 let full_name = ser_name.clone() + "." + &f.var_name;
-                if full_name.contains("m_hActiveWeapon") {
-                    println!("{} {:?}", full_name, arr);
-                }
+
                 if self.is_wanted_prop(&full_name) {
                     f.should_parse = true;
                     self.wanted_prop_paths.insert(arr);
@@ -666,7 +726,6 @@ impl<'a> Parser<'a> {
                     }
                     _ => {}
                 };
-
                 self.id_to_path.insert(self.id, arr);
                 self.id += 1;
                 self.prop_name_to_path.insert(full_name.clone(), arr);

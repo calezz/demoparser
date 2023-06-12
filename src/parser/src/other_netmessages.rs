@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use super::{read_bits::DemoParserError, sendtables::Serializer};
 use crate::parser_settings::ChatMessageRecord;
 use crate::parser_settings::EconItem;
@@ -23,6 +25,8 @@ pub struct Class {
 
 impl<'a> Parser<'a> {
     pub fn parse_class_info(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
+        println!("CLSINFO inner{}", self.ptr);
+        let before = Instant::now();
         if !self.parse_entities {
             return Ok(());
         }
@@ -35,6 +39,7 @@ impl<'a> Parser<'a> {
                 serializer: self.serializers[network_name].clone(),
             });
         }
+        println!("X {:2?}", before.elapsed());
         Ok(())
     }
 

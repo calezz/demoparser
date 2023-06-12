@@ -21,7 +21,7 @@ impl<'a> Parser<'a> {
         if !self.wanted_ticks.contains(&self.tick) && self.wanted_ticks.len() != 0 {
             return;
         }
-        //println!("{:?} {:?}", self.wanted_prop_ids, self.out_idx);
+        // println!("{:?} {:?}", self.wanted_prop_ids, self.out_idx);
         // iterate every player and every wanted prop name
         // if either one is missing then push None to output
         for (entity_id, player) in &self.players {
@@ -31,12 +31,17 @@ impl<'a> Parser<'a> {
                 // println!("{} {}", entity_id, prop_name);
                 // returns none if missing
                 let prop = self.get_prop_for_ent(prop_name, entity_id);
-                // println!("{:?} {:?}", prop, player);
                 self.output
                     .entry(*idx)
                     .or_insert_with(|| PropColumn::new())
                     .push(prop);
             }
+            /*
+            self.output
+                .entry(10002)
+                .or_insert_with(|| PropColumn::new())
+                .push(Some(Variant::I32(self.tick)));
+            */
             /*
             self.output
                 .entry(1000000)
@@ -56,11 +61,11 @@ impl<'a> Parser<'a> {
         // Function that allows you to use string name for the prop and the function
         // translates it to a path. This costs a bit but the elegance of using string names
         // is just too big to give up. Also I think paths change between demos soo...
-        //if let Some(ent) = self.entities.get(entity_id) {
-        //if let Some(prop) = ent.props.get(prop_id) {
-        //return Some(prop.clone());
-        //}
-        //}
+        if let Some(ent) = &self.entities[*entity_id as usize] {
+            if let Some(prop) = ent.props.get(prop_id) {
+                return Some(prop.clone());
+            }
+        }
         None
     }
 }

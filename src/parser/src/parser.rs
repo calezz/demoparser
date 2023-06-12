@@ -3,6 +3,8 @@ use super::read_bits::DemoParserError;
 use crate::netmessage_types::netmessage_type_from_int;
 use crate::parser_settings::Parser;
 use crate::read_bits::Bitreader;
+use crate::variants::PropColumn;
+use crate::variants::VarVec;
 
 use bitter::BitReader;
 use csgoproto::demo::*;
@@ -14,19 +16,27 @@ use EDemoCommands::*;
 
 // The parser struct is defined in parser_settings.rs
 impl<'a> Parser<'a> {
-    pub fn start(&mut self) -> Result<(), DemoParserError> {
+    pub fn start(&mut self) -> Result<i32, DemoParserError> {
         let file_length = self.bytes.len();
         // Header (there is a longer header as a DEM_FileHeader msg below)
-        let header = self.read_n_bytes(16)?;
-        Parser::handle_short_header(file_length, header)?;
+        //let header = self.read_n_bytes(16)?;
+        //Parser::handle_short_header(file_length, header)?;
         // Outer loop that continues trough the file, until "DEM_Stop" msg
+        // println!("{:2?}", self.start.elapsed());
+        // self.ptr = 31091442;
+        let mut fullpackets_parsed = 0;
+        let mut frames_parsed = 0;
         loop {
+            frames_parsed += 1;
+            let before = self.ptr;
             let cmd = self.read_varint()?;
             let tick = self.read_varint()?;
             let size = self.read_varint()?;
             self.tick = tick as i32;
 
+            //println!("{} {} {} {}", cmd, tick, size, self.ptr);
             let msg_type = cmd & !64;
+
             let is_compressed = (cmd & 64) == 64;
             let bytes = match is_compressed {
                 true => SnapDecoder::new()
@@ -39,18 +49,102 @@ impl<'a> Parser<'a> {
                 DEM_Packet => self.parse_packet(&bytes),
                 DEM_FileHeader => self.parse_header(&bytes),
                 DEM_FileInfo => self.parse_file_info(&bytes),
-                DEM_SendTables => self.parse_classes(&bytes),
-                DEM_ClassInfo => self.parse_class_info(&bytes),
+                DEM_SendTables => {
+                    // self.ptr = 179381;
+                    Ok(())
+                }
+                DEM_ClassInfo => {
+                    self.parse_class_info(&bytes);
+                    Ok(())
+                }
                 DEM_SignonPacket => self.parse_packet(&bytes),
                 DEM_UserCmd => self.parse_user_command_cmd(&bytes),
-                DEM_StringTables => self.parse_stringtable_cmd(&bytes),
+                // DEM_StringTables => self.parse_stringtable_cmd(&bytes),
+                DEM_FullPacket => {
+                    if fullpackets_parsed > 0 {
+                        break;
+                    } else {
+                        self.parse_full_packet(&bytes);
+                        fullpackets_parsed += 1;
+                        Ok(())
+                    }
+                }
                 DEM_Stop => break,
                 _ => Ok(()),
             };
             ok?;
-            //self.collect_entities();
+            self.collect_entities();
         }
-        Ok(())
+        /*
+        let pairs = to_md_pairs(&self.players);
+        let vs = to_md_vecs(&self.player_output_ids, pairs);
+
+        let names = PropColumn {
+            data: Some(VarVec::String(vs.0)),
+            num_nones: 0,
+        };
+        let steamids = PropColumn {
+            data: Some(VarVec::U64(vs.1)),
+            num_nones: 0,
+        };
+        self.output.insert(10000, names);
+        self.output.insert(10001, steamids);
+        */
+        Ok(frames_parsed)
+    }
+    pub fn front_demo_metadata(&mut self) -> Result<DemoMetaData, DemoParserError> {
+        let mut md = DemoMetaData {
+            fullpacket_offsets: vec![],
+            classinfo_offset: 0,
+            sendtable_offset: 0,
+        };
+
+        self.ptr = 16;
+        loop {
+            let before = self.ptr;
+            let cmd = self.read_varint()?;
+            let tick = self.read_varint()?;
+            let size = self.read_varint()?;
+            self.tick = tick as i32;
+
+            let msg_type = cmd & !64;
+            let is_compressed = (cmd & 64) == 64;
+            let bytes = if msg_type == 5 || msg_type == 4 {
+                match is_compressed {
+                    true => SnapDecoder::new()
+                        .decompress_vec(self.read_n_bytes(size)?)
+                        .unwrap(),
+                    false => self.read_n_bytes(size)?.to_vec(),
+                }
+            } else {
+                self.ptr += size as usize;
+                vec![]
+            };
+
+            let ok = match demo_cmd_type_from_int(msg_type as i32).unwrap() {
+                DEM_SendTables => {
+                    md.sendtable_offset = before;
+                    self.parse_classes(&bytes);
+                    println!("TABLE: {}", before);
+                    Ok(())
+                }
+                DEM_ClassInfo => {
+                    md.classinfo_offset = before;
+                    self.parse_class_info(&bytes);
+                    Ok(())
+                }
+                DEM_FullPacket => {
+                    md.fullpacket_offsets.push(before);
+                    //println!("{:2?} {} {}", self.start.elapsed(), self.tick, before);
+                    Ok(())
+                }
+                DEM_Stop => break,
+                _ => Ok(()),
+            };
+            ok?;
+        }
+        println!("{:?}", md);
+        Ok(md)
     }
 
     pub fn parse_packet(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
@@ -66,8 +160,8 @@ impl<'a> Parser<'a> {
             let ok = match netmessage_type_from_int(msg_type as i32) {
                 svc_PacketEntities => self.parse_packet_ents(&msg_bytes),
                 svc_ServerInfo => self.parse_server_info(&msg_bytes),
-                svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
-                svc_UpdateStringTable => self.update_string_table(&msg_bytes),
+                //svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
+                //svc_UpdateStringTable => self.update_string_table(&msg_bytes),
                 //GE_Source1LegacyGameEventList => self.parse_game_event_list(&msg_bytes),
                 //GE_Source1LegacyGameEvent => self.parse_event(&msg_bytes),
                 CS_UM_SendPlayerItemDrops => self.parse_item_drops(&msg_bytes),
@@ -82,6 +176,46 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
+    pub fn parse_full_packet(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
+        // Not in use atm
+
+        // A full state dump that happens every ~3000? ticks
+        // dumps all info needed to continue stringtables and entities from this tick forward. For
+        // example you could jump into middle of demo and start from here (assuming you find this).
+        // Leaves the door open for multithreading/ one off stats in end of demo
+        let full_packet: CDemoFullPacket = Message::parse_from_bytes(bytes).unwrap();
+        for item in &full_packet.string_table.tables {
+            if item.table_name.as_ref().unwrap() == "instancebaseline" {
+                for i in &item.items {
+                    let k = i.str().parse::<u32>().unwrap_or(999999);
+                    self.baselines.insert(k, i.data.as_ref().unwrap().clone());
+                }
+            }
+        }
+        let p = full_packet.packet.0.clone().unwrap();
+        let mut bitreader = Bitreader::new(p.data());
+        // Inner loop
+        while bitreader.reader.bits_remaining().unwrap() > 8 {
+            let msg_type = bitreader.read_u_bit_var().unwrap();
+            let size = bitreader.read_varint().unwrap();
+            let msg_bytes = bitreader.read_n_bytes(size as usize).unwrap();
+            let ok = match netmessage_type_from_int(msg_type as i32) {
+                svc_PacketEntities => self.parse_packet_ents(&msg_bytes),
+                svc_ServerInfo => self.parse_class_info(&msg_bytes),
+                svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
+                svc_UpdateStringTable => self.update_string_table(&msg_bytes),
+                CS_UM_SendPlayerItemDrops => self.parse_item_drops(&msg_bytes),
+                CS_UM_EndOfMatchAllPlayersData => self.parse_player_end_msg(&msg_bytes),
+                UM_SayText2 => self.parse_chat_messages(&msg_bytes),
+                net_SetConVar => self.parse_convars(&msg_bytes),
+                CS_UM_PlayerStatsUpdate => self.parse_player_stats_update(&msg_bytes),
+                _ => Ok(()),
+            };
+            ok?
+        }
+        Ok(())
+    }
+
     pub fn parse_stringtable_cmd(&mut self, data: &[u8]) -> Result<(), DemoParserError> {
         // Why do we use this and not just create/update stringtables??
         let tables: CDemoStringTables = Message::parse_from_bytes(data).unwrap();
@@ -99,6 +233,7 @@ impl<'a> Parser<'a> {
         let server_info: CSVCMsg_ServerInfo = Message::parse_from_bytes(bytes).unwrap();
         let class_count = server_info.max_classes();
         self.cls_bits = Some((class_count as f32 + 1.).log2().ceil() as u32);
+        println!("CLSBITS {:?}", self.cls_bits);
         Ok(())
     }
     pub fn parse_classes(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
@@ -108,6 +243,7 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
+
     fn handle_short_header(file_len: usize, bytes: &[u8]) -> Result<(), DemoParserError> {
         match std::str::from_utf8(&bytes[..8]) {
             Ok(magic) => match magic {
@@ -215,4 +351,34 @@ pub fn demo_cmd_type_from_int(value: i32) -> ::std::option::Option<EDemoCommands
         64 => ::std::option::Option::Some(EDemoCommands::DEM_IsCompressed),
         _ => ::std::option::Option::None,
     }
+}
+
+use crate::entities::PlayerMetaData;
+use std::collections::BTreeMap;
+
+fn to_md_pairs(map: &BTreeMap<i32, PlayerMetaData>) -> Vec<(String, u64)> {
+    let mut out = vec![("NONE".to_string(), 0_u64); 24];
+    for (k, v) in map {
+        out[(v.controller_entid.unwrap()) as usize] = (
+            v.name.as_ref().unwrap().clone(),
+            *v.steamid.as_ref().unwrap(),
+        );
+    }
+    out
+}
+fn to_md_vecs(ids: &[u8], pairs: Vec<(String, u64)>) -> (Vec<Option<String>>, Vec<Option<u64>>) {
+    let mut names = Vec::with_capacity(ids.len());
+    let mut steamids = Vec::with_capacity(ids.len());
+    for idx in 0..ids.len() {
+        let id = ids[idx] as usize;
+        names.push(Some(pairs[id].0.clone()));
+        steamids.push(Some(pairs[id].1.clone()));
+    }
+    (names, steamids)
+}
+#[derive(Debug)]
+pub struct DemoMetaData {
+    pub fullpacket_offsets: Vec<usize>,
+    pub classinfo_offset: usize,
+    pub sendtable_offset: usize,
 }

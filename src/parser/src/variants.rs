@@ -26,6 +26,9 @@ pub enum VarVec {
     F32(Vec<Option<f32>>),
     I32(Vec<Option<i32>>),
     String(Vec<Option<String>>),
+    // MD
+    StringNoNull(Vec<String>),
+    U64NoNull(Vec<u64>),
 }
 
 impl VarVec {
@@ -45,7 +48,7 @@ impl VarVec {
 #[derive(Debug, Clone)]
 pub struct PropColumn {
     pub data: Option<VarVec>,
-    num_nones: usize,
+    pub num_nones: usize,
 }
 impl PropColumn {
     pub fn new() -> Self {
@@ -130,6 +133,8 @@ impl VarVec {
             VarVec::U32(f) => f.push(None),
             VarVec::U64(f) => f.push(None),
             VarVec::Bool(f) => f.push(None),
+            VarVec::U64NoNull(_) => panic!("no null push"),
+            VarVec::StringNoNull(_) => panic!("no null push"),
         }
     }
 }
@@ -199,6 +204,12 @@ impl Serialize for OutputSerdeHelperStruct {
                     map.serialize_entry(&k, val).unwrap();
                 }
                 Some(VarVec::U32(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::StringNoNull(val)) => {
+                    map.serialize_entry(&k, val).unwrap();
+                }
+                Some(VarVec::U64NoNull(val)) => {
                     map.serialize_entry(&k, val).unwrap();
                 }
                 None => {}
