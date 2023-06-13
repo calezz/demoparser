@@ -125,7 +125,6 @@ impl<'a> Parser<'a> {
                 DEM_SendTables => {
                     md.sendtable_offset = before;
                     self.parse_classes(&bytes);
-                    println!("TABLE: {}", before);
                     Ok(())
                 }
                 DEM_ClassInfo => {
@@ -143,7 +142,6 @@ impl<'a> Parser<'a> {
             };
             ok?;
         }
-        println!("{:?}", md);
         Ok(md)
     }
 
@@ -233,7 +231,6 @@ impl<'a> Parser<'a> {
         let server_info: CSVCMsg_ServerInfo = Message::parse_from_bytes(bytes).unwrap();
         let class_count = server_info.max_classes();
         self.cls_bits = Some((class_count as f32 + 1.).log2().ceil() as u32);
-        println!("CLSBITS {:?}", self.cls_bits);
         Ok(())
     }
     pub fn parse_classes(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {

@@ -25,7 +25,6 @@ pub struct Class {
 
 impl<'a> Parser<'a> {
     pub fn parse_class_info(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
-        println!("CLSINFO inner{}", self.ptr);
         let before = Instant::now();
         if !self.parse_entities {
             return Ok(());
@@ -34,12 +33,16 @@ impl<'a> Parser<'a> {
         for class_t in msg.classes {
             let cls_id = class_t.class_id();
             let network_name = class_t.network_name();
-            self.cls_by_id[cls_id as usize] = Some(Class {
-                name: network_name.to_string(),
-                serializer: self.serializers[network_name].clone(),
-            });
+            let cls_by_id = match &mut self.cls_by_id {
+                crate::parser_settings::CLSBYID::Normal(n) => {
+                    n[cls_id as usize] = Some(Class {
+                        name: network_name.to_string(),
+                        serializer: self.serializers[network_name].clone(),
+                    });
+                }
+                crate::parser_settings::CLSBYID::Ref(r) => {}
+            };
         }
-        println!("X {:2?}", before.elapsed());
         Ok(())
     }
 

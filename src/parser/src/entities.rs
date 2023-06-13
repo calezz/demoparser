@@ -195,7 +195,11 @@ impl<'a> Parser<'a> {
             Some(ent) => ent,
             None => return Err(DemoParserError::EntityNotFound),
         };
-        let class = match self.cls_by_id[entity.cls_id as usize].as_ref() {
+        let mut cls_by_id = match &self.cls_by_id {
+            crate::parser_settings::CLSBYID::Normal(n) => n,
+            crate::parser_settings::CLSBYID::Ref(r) => r,
+        };
+        let class = match cls_by_id[entity.cls_id as usize].as_ref() {
             Some(cls) => cls,
             None => return Err(DemoParserError::ClassNotFound),
         };
@@ -353,7 +357,11 @@ impl<'a> Parser<'a> {
         Ok(())
     }
     pub fn check_entity_type(&self, cls_id: &u32) -> EntityType {
-        let class = self.cls_by_id[*cls_id as usize].as_ref().unwrap();
+        let mut cls_by_id = match &self.cls_by_id {
+            crate::parser_settings::CLSBYID::Normal(n) => n,
+            crate::parser_settings::CLSBYID::Ref(r) => r,
+        };
+        let class = cls_by_id[*cls_id as usize].as_ref().unwrap();
 
         match class.name.as_str() {
             "CCSPlayerController" => return EntityType::PlayerController,

@@ -567,7 +567,6 @@ impl<'a> Parser<'a> {
                 name: serializer_msg.symbols[serializer.serializer_name_sym() as usize].clone(),
                 fields: vec![],
             };
-            fields.clear();
 
             for idx in &serializer.fields_index {
                 match fields.get(idx) {
@@ -619,8 +618,8 @@ impl<'a> Parser<'a> {
             self.serializers
                 .insert(my_serializer.name.clone(), my_serializer);
         }
-        println!("{:2?}", self.start.elapsed());
-        println!("T {:2?}", before.elapsed());
+        //ln!("{:2?}", self.start.elapsed());
+        //println!("T {:2?}", before.elapsed());
 
         //panic!("done");
         Ok(())
