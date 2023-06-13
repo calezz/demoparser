@@ -55,39 +55,39 @@ fn main() {
 
         let mut parser = Parser::new(settings.clone()).unwrap();
         let md = parser.front_demo_metadata().unwrap();
-        // println!("FRONT TOOK: {:2?}", before.elapsed());
+        println!("FRONT TOOK: {:2?}", before.elapsed());
 
-        let mut parsers = vec![];
+        if let Some(h) = parser.cls_by_id_handle {
+            let m = h.join().unwrap();
+            let q = parser.cls_handle.unwrap().join().unwrap();
 
-        let before = Instant::now();
-        for offset in md.fullpacket_offsets {
-            let mut parser2 = Parser::new(settings.clone()).unwrap();
-            parser2.ptr = offset;
-            //parser2.cls_by_id = parser::parser_settings::CLSBYID::Ref(&n);
-            parser2.cls_bits = parser.cls_bits.clone();
-            parser2.qf_map = parser.qf_map.clone();
-            parser2.controller_ids = parser.controller_ids.clone();
-            parsers.push(parser2);
-        }
-        // println!("COPY TOOK: {:2?}", before.elapsed());
+            let mut parsers = vec![];
+            let before = Instant::now();
 
-        let before = Instant::now();
-
-        match &parser.cls_by_id {
-            parser::parser_settings::CLSBYID::Normal(n) => {
-                let res: Vec<Result<i32, DemoParserError>> = parsers
-                    .par_iter_mut()
-                    .map(|p| {
-                        p.cls_by_id = parser::parser_settings::CLSBYID::Ref(&n);
-                        p.start()
-                    })
-                    .collect();
-                // println!("{:?}", res);
+            for offset in md.fullpacket_offsets {
+                let mut parser2 = Parser::new(settings.clone()).unwrap();
+                parser2.ptr = offset;
+                parser2.cls_by_id = parser::parser_settings::CLSBYID::Ref(&m);
+                parser2.cls_bits = parser.cls_bits.clone();
+                parser2.qf_map = q.clone();
+                parser2.controller_ids = parser.controller_ids.clone();
+                parsers.push(parser2);
             }
-            _ => {}
+
+            println!("COPY TOOK: {:2?}", before.elapsed());
+
+            match &parser.cls_by_id {
+                parser::parser_settings::CLSBYID::Normal(n) => {
+                    let res: Vec<Result<i32, DemoParserError>> =
+                        parsers.par_iter_mut().map(|p| p.start()).collect();
+                    // println!("{:?}", res);
+                }
+                _ => {}
+            }
+            println!("PARSING TOOK: {:2?}", before.elapsed());
         }
         // println!("PARSING TOOK: {:2?}", before.elapsed());
-
         // println!("TOTAL TOOK: {:2?}", a.elapsed());
+        // break;
     }
 }

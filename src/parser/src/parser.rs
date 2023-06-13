@@ -12,6 +12,9 @@ use csgoproto::netmessages::*;
 use netmessage_types::NetmessageType::*;
 use protobuf::Message;
 use snap::raw::Decoder as SnapDecoder;
+use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 use EDemoCommands::*;
 
 // The parser struct is defined in parser_settings.rs
@@ -19,13 +22,14 @@ impl<'a> Parser<'a> {
     pub fn start(&mut self) -> Result<i32, DemoParserError> {
         let file_length = self.bytes.len();
         // Header (there is a longer header as a DEM_FileHeader msg below)
-        //let header = self.read_n_bytes(16)?;
-        //Parser::handle_short_header(file_length, header)?;
+        // let header = self.read_n_bytes(16)?;
+        // Parser::handle_short_header(file_length, header)?;
         // Outer loop that continues trough the file, until "DEM_Stop" msg
         // println!("{:2?}", self.start.elapsed());
         // self.ptr = 31091442;
         let mut fullpackets_parsed = 0;
         let mut frames_parsed = 0;
+        self.st = Instant::now();
         loop {
             frames_parsed += 1;
             let before = self.ptr;
@@ -54,7 +58,7 @@ impl<'a> Parser<'a> {
                     Ok(())
                 }
                 DEM_ClassInfo => {
-                    self.parse_class_info(&bytes);
+                    self.parse_class_info(&bytes, self.serializers.clone());
                     Ok(())
                 }
                 DEM_SignonPacket => self.parse_packet(&bytes),
@@ -90,6 +94,7 @@ impl<'a> Parser<'a> {
         self.output.insert(10000, names);
         self.output.insert(10001, steamids);
         */
+        println!("XX {:2?} {:2?}", self.start.elapsed(), self.st.elapsed());
         Ok(frames_parsed)
     }
     pub fn front_demo_metadata(&mut self) -> Result<DemoMetaData, DemoParserError> {
@@ -129,7 +134,7 @@ impl<'a> Parser<'a> {
                 }
                 DEM_ClassInfo => {
                     md.classinfo_offset = before;
-                    self.parse_class_info(&bytes);
+                    self.parse_class_info(&bytes, self.serializers.clone());
                     Ok(())
                 }
                 DEM_FullPacket => {
@@ -142,6 +147,7 @@ impl<'a> Parser<'a> {
             };
             ok?;
         }
+        println!("SF {:2?}", self.start.elapsed());
         Ok(md)
     }
 
@@ -157,7 +163,7 @@ impl<'a> Parser<'a> {
 
             let ok = match netmessage_type_from_int(msg_type as i32) {
                 svc_PacketEntities => self.parse_packet_ents(&msg_bytes),
-                svc_ServerInfo => self.parse_server_info(&msg_bytes),
+                // svc_ServerInfo => self.parse_server_info(&msg_bytes),
                 //svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
                 //svc_UpdateStringTable => self.update_string_table(&msg_bytes),
                 //GE_Source1LegacyGameEventList => self.parse_game_event_list(&msg_bytes),
@@ -199,7 +205,7 @@ impl<'a> Parser<'a> {
             let msg_bytes = bitreader.read_n_bytes(size as usize).unwrap();
             let ok = match netmessage_type_from_int(msg_type as i32) {
                 svc_PacketEntities => self.parse_packet_ents(&msg_bytes),
-                svc_ServerInfo => self.parse_class_info(&msg_bytes),
+                // svc_ServerInfo => self.parse_class_info(&msg_bytes),
                 svc_CreateStringTable => self.parse_create_stringtable(&msg_bytes),
                 svc_UpdateStringTable => self.update_string_table(&msg_bytes),
                 CS_UM_SendPlayerItemDrops => self.parse_item_drops(&msg_bytes),
@@ -235,8 +241,17 @@ impl<'a> Parser<'a> {
     }
     pub fn parse_classes(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
         if self.parse_entities {
-            let tables: CDemoSendTables = Message::parse_from_bytes(bytes).unwrap();
-            self.parse_sendtable(tables)?;
+            let my_bytes = bytes.to_vec();
+            let done = self.sendtables_done.clone();
+            let ser = self.serializers.clone();
+            let handle = thread::spawn(move || {
+                let tables: CDemoSendTables = Message::parse_from_bytes(&my_bytes).unwrap();
+                Parser::parse_sendtable(tables, done, ser).unwrap()
+            });
+            self.cls_handle = Some(handle);
+            // println!("ser done {:?}", self.serializers);
+            //let tables: CDemoSendTables = Message::parse_from_bytes(&bytes).unwrap();
+            //(self.serializers, self.qf_map) = Parser::parse_sendtable(tables, done).unwrap();
         }
         Ok(())
     }

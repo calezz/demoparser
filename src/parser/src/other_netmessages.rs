@@ -1,3 +1,4 @@
+use std::sync::RwLock;
 use std::time::Instant;
 
 use super::{read_bits::DemoParserError, sendtables::Serializer};
@@ -5,6 +6,7 @@ use crate::parser_settings::ChatMessageRecord;
 use crate::parser_settings::EconItem;
 use crate::parser_settings::Parser;
 use crate::parser_settings::PlayerEndData;
+use ahash::AHashMap;
 use ahash::HashSet;
 use csgoproto::cstrike15_usermessages::CCSUsrMsg_EndOfMatchAllPlayersData;
 use csgoproto::cstrike15_usermessages::CCSUsrMsg_SendPlayerItemDrops;
@@ -13,6 +15,9 @@ use csgoproto::demo::CDemoFileInfo;
 use csgoproto::networkbasetypes::CNETMsg_SetConVar;
 use csgoproto::usermessages::CUserMessageSayText2;
 use protobuf::Message;
+use std::sync::Arc;
+use std::thread;
+use std::thread::JoinHandle;
 
 // This file has functions for the simpler netmessages.
 // Don't want to create a new file for each of these.
@@ -24,25 +29,83 @@ pub struct Class {
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse_class_info(&mut self, bytes: &[u8]) -> Result<(), DemoParserError> {
+    pub fn parse_class_info(
+        &mut self,
+        bytes: &[u8],
+        global_ser: Arc<RwLock<AHashMap<String, Serializer>>>,
+    ) -> Result<(), DemoParserError> {
         let before = Instant::now();
         if !self.parse_entities {
-            return Ok(());
+            //return Ok(AHashMap::default());
         }
-        let msg: CDemoClassInfo = Message::parse_from_bytes(&bytes).unwrap();
-        for class_t in msg.classes {
-            let cls_id = class_t.class_id();
-            let network_name = class_t.network_name();
-            let cls_by_id = match &mut self.cls_by_id {
-                crate::parser_settings::CLSBYID::Normal(n) => {
-                    n[cls_id as usize] = Some(Class {
-                        name: network_name.to_string(),
-                        serializer: self.serializers[network_name].clone(),
-                    });
-                }
-                crate::parser_settings::CLSBYID::Ref(r) => {}
-            };
-        }
+        let my_bytes = bytes.to_vec();
+        let can_start = self.sendtables_done.clone();
+
+        let t = self.start.clone();
+
+        let handle = thread::spawn(move || {
+            let mut cls_by_id: [Option<Class>; 560] = [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+            ];
+            let msg: CDemoClassInfo = Message::parse_from_bytes(&my_bytes).unwrap();
+            while !can_start.load(std::sync::atomic::Ordering::SeqCst) {
+                // println!("WAITING");
+            }
+            println!("DONE");
+
+            let ser = global_ser.read().unwrap();
+
+            for class_t in &msg.classes {
+                let cls_id = class_t.class_id();
+                let network_name = class_t.network_name();
+                cls_by_id[cls_id as usize] = Some(Class {
+                    name: network_name.to_string(),
+                    serializer: ser.get(network_name).unwrap().clone(),
+                });
+            }
+            println!("E {:2?}", t.elapsed());
+            cls_by_id
+        });
+        self.cls_by_id_handle = Some(handle);
         Ok(())
     }
 

@@ -20,6 +20,10 @@ use csgoproto::netmessages::csvcmsg_game_event_list::Descriptor_t;
 use phf_macros::phf_map;
 use soa_derive::StructOfArray;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::thread::JoinHandle;
 use std::time::Instant;
 
 // Wont fit in L1, evaluate if worth to use pointer method
@@ -40,7 +44,7 @@ pub struct Parser<'a> {
     pub huffman_lookup_table: &'a Vec<(u32, u8)>,
     // Parsing state
     pub ge_list: Option<AHashMap<i32, Descriptor_t>>,
-    pub serializers: AHashMap<String, Serializer, RandomState>,
+    pub serializers: Arc<RwLock<AHashMap<String, Serializer, RandomState>>>,
     pub cls_by_id: CLSBYID<'a>,
     pub cls_bits: Option<u32>,
     pub entities: [Option<Entity>; 2048],
@@ -66,6 +70,10 @@ pub struct Parser<'a> {
     pub qf_map: QfMapper,
     pub cls_from_entid: [u32; 2048],
     pub start: Instant,
+    pub cls_handle: Option<JoinHandle<QfMapper>>,
+    pub sendtables_done: Arc<AtomicBool>,
+    pub cls_by_id_handle: Option<JoinHandle<[std::option::Option<Class>; 560]>>,
+    pub st: Instant,
 
     // Output from parsing
     pub output: AHashMap<u32, PropColumn, RandomState>,
@@ -172,7 +180,9 @@ impl<'a> Parser<'a> {
             "name".to_owned(),
         ]);
         Ok(Parser {
-            serializers: AHashMap::default(),
+            st: Instant::now(),
+            sendtables_done: Arc::new(AtomicBool::new(false)),
+            serializers: Arc::new(RwLock::new(AHashMap::default())),
             ptr: 0,
             ge_list: None,
             bytes: settings.bytes,
@@ -181,6 +191,7 @@ impl<'a> Parser<'a> {
             player_output_ids: vec![],
             wanted_prop_ids: vec![],
             prop_out_id: 0,
+            cls_handle: None,
             //qf_map: AHashMap::default(),
             qf_map: QfMapper {
                 idx: 0,
@@ -193,6 +204,7 @@ impl<'a> Parser<'a> {
                 steamid: None,
                 player_pawn: None,
             },
+            cls_by_id_handle: None,
             // JUST LOL
             cls_by_id: CLSBYID::Normal([
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,

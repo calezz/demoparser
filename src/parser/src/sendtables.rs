@@ -19,6 +19,7 @@ use lazy_static::lazy_static;
 use phf_macros::phf_map;
 use protobuf::Message;
 use regex::Regex;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Field {
@@ -72,6 +73,8 @@ pub enum FieldModel {
     FieldModelNOTSET,
 }
 use std::fmt;
+use std::sync::atomic::AtomicBool;
+use std::sync::RwLock;
 
 impl fmt::Display for Decoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -550,9 +553,12 @@ const POINTER_TYPES: &'static [&'static str] = &[
 impl<'a> Parser<'a> {
     // This part is so insanely complicated. There are multiple versions of each serializer and
     // each serializer is this huge nested struct.
-    pub fn parse_sendtable(&mut self, tables: CDemoSendTables) -> Result<(), DemoParserError> {
+    pub fn parse_sendtable(
+        tables: CDemoSendTables,
+        done: Arc<AtomicBool>,
+        ser_global: Arc<RwLock<AHashMap<String, Serializer>>>,
+    ) -> Result<QfMapper, DemoParserError> {
         use std::time::Instant;
-
         let before = Instant::now();
         let mut bitreader = Bitreader::new(tables.data());
         let n_bytes = bitreader.read_varint()?;
@@ -562,6 +568,13 @@ impl<'a> Parser<'a> {
             Message::parse_from_bytes(&bytes).unwrap();
 
         let mut fields: HashMap<i32, Field> = HashMap::default();
+        let mut qf_map = QfMapper {
+            idx: 0,
+            map: AHashMap::default(),
+        };
+        //let mut global_serializers: AHashMap<String, Serializer> = AHashMap::default();
+        let mut global_serializers = ser_global.write().unwrap();
+
         for (ii, serializer) in serializer_msg.serializers.iter().enumerate() {
             let mut my_serializer = Serializer {
                 name: serializer_msg.symbols[serializer.serializer_name_sym() as usize].clone(),
@@ -575,7 +588,7 @@ impl<'a> Parser<'a> {
                         let field_msg = &serializer_msg.fields[*idx as usize];
                         let mut field = field_from_msg(field_msg, &serializer_msg);
                         match &field.serializer_name {
-                            Some(name) => match self.serializers.get(name) {
+                            Some(name) => match global_serializers.get(name) {
                                 Some(ser) => {
                                     field.serializer = Some(ser.clone());
                                 }
@@ -583,28 +596,27 @@ impl<'a> Parser<'a> {
                             },
                             None => {}
                         }
-
                         match &field.serializer {
                             Some(_) => {
                                 if field.field_type.pointer
                                     || POINTER_TYPES.contains(&field.field_type.base_type.as_str())
                                 {
-                                    field.find_decoder(FieldModelFixedTable, &mut self.qf_map)
+                                    field.find_decoder(FieldModelFixedTable, &mut qf_map)
                                 } else {
-                                    field.find_decoder(FieldModelVariableTable, &mut self.qf_map)
+                                    field.find_decoder(FieldModelVariableTable, &mut qf_map)
                                 }
                             }
                             None => {
                                 if field.field_type.count > 0
                                     && field.field_type.base_type != "char"
                                 {
-                                    field.find_decoder(FieldModelFixedArray, &mut self.qf_map)
+                                    field.find_decoder(FieldModelFixedArray, &mut qf_map)
                                 } else if field.field_type.base_type == "CUtlVector"
                                     || field.field_type.base_type == "CNetworkUtlVectorBase"
                                 {
-                                    field.find_decoder(FieldModelVariableArray, &mut self.qf_map)
+                                    field.find_decoder(FieldModelVariableArray, &mut qf_map)
                                 } else {
-                                    field.find_decoder(FieldModelSimple, &mut self.qf_map)
+                                    field.find_decoder(FieldModelSimple, &mut qf_map)
                                 }
                             }
                         }
@@ -615,14 +627,14 @@ impl<'a> Parser<'a> {
             }
 
             // self.find_prop_name_paths(&mut my_serializer);
-            self.serializers
-                .insert(my_serializer.name.clone(), my_serializer);
+            global_serializers.insert(my_serializer.name.clone(), my_serializer);
         }
         //ln!("{:2?}", self.start.elapsed());
         //println!("T {:2?}", before.elapsed());
-
+        done.store(true, std::sync::atomic::Ordering::SeqCst);
+        println!("{:?}", done);
         //panic!("done");
-        Ok(())
+        Ok(qf_map)
     }
     /*
     pub fn x(
