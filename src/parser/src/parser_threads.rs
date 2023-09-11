@@ -6,9 +6,12 @@ use crate::read_bits::Bitreader;
 use bitter::BitReader;
 use csgoproto::demo::*;
 use csgoproto::netmessages::*;
+use csgoproto::steammessages::CMsgNotificationOfSuspiciousActivity;
 use netmessage_types::NetmessageType::*;
 use protobuf::Message;
 use snap::raw::Decoder as SnapDecoder;
+use std::fs;
+use std::io::Write;
 use EDemoCommands::*;
 
 // The parser struct is defined in parser_settings.rs
@@ -64,7 +67,16 @@ impl ParserThread {
                 _ => Ok(()),
             };
             ok?;
+
             self.collect_entities();
+        }
+        for (k, v) in &self.players {
+            if let Some(ent) = self.entities.get(&k) {
+                for (n, v) in &ent.props {
+                    let name = self.prop_controller.id_to_name.get(n);
+                    // println!("{:?} {:?}", name, v);
+                }
+            }
         }
         Ok(())
     }
@@ -93,6 +105,34 @@ impl ParserThread {
                 UM_SayText2 => self.parse_chat_messages(&msg_bytes),
                 net_SetConVar => self.parse_convars(&msg_bytes),
                 CS_UM_PlayerStatsUpdate => self.parse_player_stats_update(&msg_bytes),
+                svc_VoiceData => {
+                    /*
+                    let voicedata: CSVCMsg_VoiceData = Message::parse_from_bytes(&msg_bytes).unwrap();
+                    /*
+                    let path = format!(
+                        "/home/laiho/Documents/programming/rust/cs2/src/parts/{}@{}@{}.raw",
+                        self.tick.to_string(),
+                        voicedata.audio.section_number().to_string(),
+                        voicedata.audio.sequence_bytes(),
+                    );
+                    fs::write(path, voicedata.audio.voice_data()).unwrap();
+                    println!(
+                        "{:?} {:?}",
+                        voicedata.audio.section_number(),
+                        voicedata.audio.sequence_bytes()
+                    );
+                    */
+                    let path = format!(
+                        "/home/laiho/Documents/programming/rust/cs2/src/parts/{}.raw",
+                        voicedata.audio.section_number(),
+                    );
+
+                    use std::fs::OpenOptions;
+                    let mut file = OpenOptions::new().read(true).append(true).create(true).open(path).unwrap();
+                    file.write_all(voicedata.audio.voice_data()).unwrap();
+                    */
+                    Ok(())
+                }
                 _ => Ok(()),
             };
             ok?;

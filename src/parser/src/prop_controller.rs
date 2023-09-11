@@ -20,6 +20,7 @@ const NORMAL_PROP_BASEID: u32 = 1000;
 
 pub const WEAPON_SKIN_ID: u32 = 420420420;
 pub const WEAPON_ORIGINGAL_OWNER_ID: u32 = 6942000;
+pub const MY_WEAPONS_OFFSET: u32 = 500000;
 
 #[derive(Clone, Debug)]
 pub struct PropController {
@@ -83,6 +84,15 @@ impl PropController {
                 });
                 someid += 1;
             }
+        }
+        if self.wanted_player_props.contains(&("equipment".to_string())) {
+            self.prop_infos.push(PropInfo {
+                id: MY_WEAPONS_OFFSET,
+                prop_type: PropType::Custom,
+                prop_name: "equipment".to_string(),
+                prop_friendly_name: "equipment".to_string(),
+                is_player_prop: true,
+            });
         }
         if self
             .wanted_player_props
@@ -202,6 +212,7 @@ impl PropController {
                 return;
             }
             None => {
+                self.id_to_name.insert(self.id, weap_prop.to_string());
                 self.name_to_id.insert(weap_prop.to_string(), self.id);
                 f.prop_id = self.id as usize;
                 self.set_special_ids(&weap_prop, is_grenade_or_weapon, self.id);
@@ -240,6 +251,9 @@ impl PropController {
         }
     }
     pub fn handle_prop(&mut self, full_name: &str, f: &mut Field) {
+        if full_name.contains("m_iItemDefinitionIndex") {
+            // println!("{:?} {:?}", full_name, f.);
+        }
         // CAK47.m_iClip1 => ["CAK47", "m_iClip1"]
         let split_at_dot: Vec<&str> = full_name.split(".").collect();
         let is_weapon_prop = (split_at_dot[0].contains("Weapon") || split_at_dot[0].contains("AK"))
@@ -352,6 +366,7 @@ impl PropController {
                 "CCSPlayerPawn.CBodyComponentBaseAnimGraph.m_cellZ" => self.special_ids.cell_z_player = Some(id),
                 "CCSPlayerPawn.CBodyComponentBaseAnimGraph.m_vecZ" => self.special_ids.cell_z_offset_player = Some(id),
                 "CCSPlayerPawn.CCSPlayer_WeaponServices.m_hActiveWeapon" => self.special_ids.active_weapon = Some(id),
+                "CCSPlayerPawn.CCSPlayer_WeaponServices.m_hMyWeapons" => self.special_ids.my_weapons = Some(id),
                 _ => {}
             };
         }

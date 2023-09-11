@@ -10,9 +10,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 fn main() {
-    let wanted_props = vec!["active_weapon_original_owner".to_string()];
+    let wanted_props = vec!["equipment".to_string()];
     let before = Instant::now();
-    let dir = fs::read_dir("/home/laiho/Documents/demos/cs2/test3/").unwrap();
+    let dir = fs::read_dir("/home/laiho/Documents/demos/cs2/driv/z/").unwrap();
     let mut c = 0;
     let huf = create_huffman_lookup_table();
 
@@ -34,8 +34,8 @@ fn main() {
             bytes: Arc::new(BytesVariant::Mmap(mmap)),
             wanted_player_props: wanted_props.clone(),
             wanted_player_props_og_names: wanted_props.clone(),
-            wanted_events: vec!["player_blind".to_string()],
-            //wanted_event: None,
+            //wanted_events: vec!["player_blind".to_string()],
+            wanted_events: vec![],
             wanted_other_props: vec![
                 "CCSTeam.m_iScore".to_string(),
                 "CCSTeam.m_szTeamname".to_string(),
@@ -58,7 +58,7 @@ fn main() {
         let mut ds = Parser::new(settings);
         let d = ds.parse_demo().unwrap();
         println!("TOTAL {:?}", before.elapsed());
-        println!("{:?}", d.game_events_counter);
+        println!("{:?}", d.df);
     }
     println!("TOTAL {:?}", before.elapsed());
 }

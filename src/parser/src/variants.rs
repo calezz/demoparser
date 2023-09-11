@@ -19,6 +19,7 @@ pub enum Variant {
     String(String),
     VecXY([f32; 2]),
     VecXYZ([f32; 3]),
+    List(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +30,7 @@ pub enum VarVec {
     F32(Vec<Option<f32>>),
     I32(Vec<Option<i32>>),
     String(Vec<Option<String>>),
+    List(Vec<Vec<String>>),
 }
 
 impl VarVec {
@@ -40,6 +42,7 @@ impl VarVec {
             Variant::String(_) => VarVec::String(vec![]),
             Variant::U64(_) => VarVec::U64(vec![]),
             Variant::U32(_) => VarVec::U32(vec![]),
+            Variant::List(_) => VarVec::List(vec![]),
             _ => panic!("Tried to create propcolumns from: {:?}", item),
         }
     }
@@ -66,6 +69,7 @@ impl PropColumn {
             Some(VarVec::String(b)) => b.len(),
             Some(VarVec::U32(b)) => b.len(),
             Some(VarVec::U64(b)) => b.len(),
+            Some(VarVec::List(b)) => b.len(),
             None => self.num_nones,
         }
     }
@@ -149,6 +153,19 @@ impl PropColumn {
                     panic!("illegal 6");
                 }
             },
+            Some(VarVec::List(v)) => match &other.data {
+                Some(VarVec::List(v_other)) => {
+                    v.extend_from_slice(&v_other);
+                }
+                None => {
+                    for _ in 0..other.num_nones {
+                        v.push(vec![]);
+                    }
+                }
+                _ => {
+                    panic!("illegal 7");
+                }
+            },
             None => match &other.data {
                 Some(VarVec::Bool(_inner)) => {
                     self.resolve_vec_type(PropColumn::get_type(&other.data));
@@ -174,6 +191,10 @@ impl PropColumn {
                     self.resolve_vec_type(PropColumn::get_type(&other.data));
                     self.extend_from(other);
                 }
+                Some(VarVec::List(_inner)) => {
+                    self.resolve_vec_type(PropColumn::get_type(&other.data));
+                    self.extend_from(other);
+                }
                 None => {
                     self.num_nones += other.num_nones;
                 }
@@ -189,6 +210,7 @@ impl PropColumn {
             Some(VarVec::String(_)) => Some(3),
             Some(VarVec::U32(_)) => Some(4),
             Some(VarVec::U64(_)) => Some(5),
+            Some(VarVec::List(_)) => Some(6),
             None => None,
         }
     }
@@ -271,6 +293,12 @@ impl VarVec {
                     panic!("Tried to push a {:?} into a {:?} column", item, self);
                 }
             },
+            Some(Variant::List(p)) => match self {
+                VarVec::List(f) => f.push(p),
+                _ => {
+                    // panic!("Tried to push a {:?} into a {:?} column", item, self);
+                }
+            },
             None => self.push_none(),
             _ => panic!("bad type for prop: {:?}", item),
         }
@@ -283,6 +311,7 @@ impl VarVec {
             VarVec::U32(f) => f.push(None),
             VarVec::U64(f) => f.push(None),
             VarVec::Bool(f) => f.push(None),
+            VarVec::List(f) => f.push(vec![]),
         }
     }
 }
@@ -457,6 +486,10 @@ pub fn soa_to_aos(soa: OutputSerdeHelperStruct) -> Vec<HashMap<String, Option<Va
                         Some(f) => hm.insert(prop_info.prop_friendly_name.clone(), Some(Variant::U32(*f))),
                         None => hm.insert(prop_info.prop_friendly_name.clone(), None),
                     },
+                    Some(VarVec::List(val)) => match val.get(idx) {
+                        Some(f) => hm.insert(prop_info.prop_friendly_name.clone(), Some(Variant::List(f.clone()))),
+                        None => hm.insert(prop_info.prop_friendly_name.clone(), None),
+                    },
                 };
             }
         }
@@ -498,6 +531,9 @@ impl Serialize for OutputSerdeHelperStruct {
                         map.serialize_entry(&prop_info.prop_friendly_name, val).unwrap();
                     }
                     Some(VarVec::U32(val)) => {
+                        map.serialize_entry(&prop_info.prop_friendly_name, val).unwrap();
+                    }
+                    Some(VarVec::List(val)) => {
                         map.serialize_entry(&prop_info.prop_friendly_name, val).unwrap();
                     }
                 }

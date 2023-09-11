@@ -5,6 +5,7 @@ use crate::maps::PAINTKITS;
 use crate::maps::WEAPINDICIES;
 use crate::parser_thread_settings::ParserThread;
 use crate::prop_controller::PropInfo;
+use crate::prop_controller::MY_WEAPONS_OFFSET;
 use crate::prop_controller::WEAPON_SKIN_ID;
 use crate::variants::PropColumn;
 use std::fmt;
@@ -82,6 +83,7 @@ pub enum PropCollectionError {
     OriginalOwnerXuidHighNotFound,
     OriginalOwnerXuidlowIncorrectVariant,
     OriginalOwnerXuidHighIncorrectVariant,
+    MyWeaponsIdNotSet,
 }
 // DONT KNOW IF THESE ARE CORRECT. SEEMS TO GIVE CORRECT VALUES
 const CELL_BITS: i32 = 9;
@@ -315,7 +317,7 @@ impl ParserThread {
         }
     }
 
-    fn find_weapon_name(&self, entity_id: &i32) -> Result<Variant, PropCollectionError> {
+    fn find_active_weapon_name(&self, entity_id: &i32) -> Result<Variant, PropCollectionError> {
         let item_def_id = match self.prop_controller.special_ids.item_def {
             Some(x) => x,
             None => return Err(PropCollectionError::SpecialidsItemDefNotSet),
@@ -439,11 +441,41 @@ impl ParserThread {
             "Z" => self.collect_cell_coordinate_player(CoordinateAxis::Z, entity_id),
             "pitch" => self.find_pitch_or_yaw(entity_id, 0),
             "yaw" => self.find_pitch_or_yaw(entity_id, 1),
-            "weapon_name" => self.find_weapon_name(entity_id),
-            "weapon_skin" => self.find_weapon_skin(entity_id),
+            "weapon_name" => self.find_active_weapon_name(entity_id),
+            "weapon_skin" => self.find_active_weapon_skin(entity_id),
             "active_weapon_original_owner" => self.find_weapon_original_owner(entity_id),
+            "equipment" => self.find_my_equipment(entity_id),
             _ => Err(PropCollectionError::UnknownCustomPropName),
         }
+    }
+    pub fn find_my_equipment(&self, entity_id: &i32) -> Result<Variant, PropCollectionError> {
+        let weapons_id = match self.prop_controller.special_ids.my_weapons {
+            Some(id) => id,
+            None => return Err(PropCollectionError::MyWeaponsIdNotSet),
+        };
+        let mut names = vec![];
+        for i in 0..32 {
+            let prop_id = MY_WEAPONS_OFFSET + i;
+            if let Ok(Variant::U32(e)) = self.get_prop_from_ent(&(prop_id as u32), entity_id) {
+                let eid = e & 0x7FF;
+                if let Some(e) = self.entities.get(&(eid as i32)) {
+                    if let Some(c) = self.cls_by_id.get(&e.cls_id) {
+                        names.push(c.name.to_string());
+                    }
+                }
+                /*
+                let itemdef = self.prop_controller.special_ids.item_def.unwrap();
+                if let Ok(Variant::U32(itdef)) = self.get_prop_from_ent(&itemdef, &(eid as i32)) {
+                    let res = match WEAPINDICIES.get(&itdef) {
+                        Some(v) => Ok(Variant::String(v.to_string())),
+                        None => Err(PropCollectionError::WeaponIdxMappingNotFound),
+                    };
+                    println!("RES {:?}", res);
+                }
+                */
+            }
+        }
+        Ok(Variant::List(names))
     }
 
     pub fn find_weapon_original_owner(&self, entity_id: &i32) -> Result<Variant, PropCollectionError> {
@@ -469,7 +501,7 @@ impl ParserThread {
         Ok(Variant::String(combined.to_string()))
     }
 
-    pub fn find_weapon_skin(&self, player_entid: &i32) -> Result<Variant, PropCollectionError> {
+    pub fn find_active_weapon_skin(&self, player_entid: &i32) -> Result<Variant, PropCollectionError> {
         match self.find_weapon_prop(&WEAPON_SKIN_ID, player_entid) {
             Ok(Variant::F32(f)) => {
                 // The value is stored as a float for some reason

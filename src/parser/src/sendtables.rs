@@ -3,6 +3,7 @@ use crate::decoder::QfMapper;
 use crate::entities_utils::FieldPath;
 use crate::parser_settings::Parser;
 use crate::prop_controller::PropController;
+use crate::prop_controller::MY_WEAPONS_OFFSET;
 use crate::prop_controller::WEAPON_SKIN_ID;
 use crate::q_float::QuantalizedFloat;
 use crate::sendtables::Decoder::*;
@@ -192,6 +193,9 @@ impl Field {
                 };
             }
             FieldModelFixedArray => {
+                if path.path[0] == 86 {
+                    // println!("ARRAY {:?}", path);
+                }
                 return FieldInfo {
                     decoder: self.decoder,
                     should_parse: self.should_parse,
@@ -200,6 +204,9 @@ impl Field {
                 };
             }
             FieldModelFixedTable => {
+                if path.path[0] == 86 {
+                    // println!("TABLE {:?}", path);
+                }
                 if path.last == pos - 1 {
                     if self.base_decoder.is_some() {
                         return FieldInfo {
@@ -225,11 +232,14 @@ impl Field {
                 }
             }
             FieldModelVariableArray => {
+                if path.path[0] == 86 {
+                    // println!("VARAR {:?}", path);
+                }
                 if path.last == pos {
                     return FieldInfo {
                         decoder: self.child_decoder.unwrap(),
                         should_parse: self.should_parse,
-                        prop_id: self.prop_id as u32,
+                        prop_id: path.path[path.last] as u32,
                         controller_prop: self.controller_prop,
                     };
                 } else {
@@ -242,6 +252,9 @@ impl Field {
                 }
             }
             FieldModelVariableTable => {
+                if path.path[0] == 86 {
+                    // println!("VATABL {:?}", path);
+                }
                 if path.last >= pos + 1 {
                     match &self.serializer {
                         Some(ser) => {
@@ -501,9 +514,25 @@ pub struct Serializer {
 
 impl Serializer {
     pub fn find_decoder(&self, path: &FieldPath, pos: usize) -> FieldInfo {
+        // SKETCHY EARLY RETURN
+        if path.path[0] == 86 && path.path[1] == 0 && path.path[2] != 0 {
+            return FieldInfo {
+                controller_prop: None,
+                decoder: UnsignedDecoder,
+                should_parse: true,
+                prop_id: MY_WEAPONS_OFFSET + path.path[2] as u32,
+            };
+        }
         self.fields[path.path[pos] as usize].decoder_from_path(path, pos + 1)
     }
     pub fn debug_find_decoder(&self, path: &FieldPath, pos: usize, prop_name: String) -> DebugField {
+        if path.path[0] == 86 && path.path[1] == 0 {
+            return DebugField {
+                decoder: UnsignedDecoder,
+                full_name: "CCSPlayerPawn.CCSPlayer_WeaponServices.m_hMyWeapons22".to_string(),
+                field: None,
+            };
+        }
         let idx = path.path[pos];
         let f = &self.fields[idx as usize];
         f.debug_decoder_from_path(path, pos + 1, prop_name)

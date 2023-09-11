@@ -105,16 +105,40 @@ impl ParserThread {
             for (field_info, debug) in self.field_infos[..n_updates].iter().zip(&self.debug_fields) {
                 let result = bitreader.decode(&field_info.decoder, &self.qf_mapper)?;
                 // self.game_events_counter.insert(debug.field.full_name.clone());
-                if debug.field.full_name.contains("Time") {
+                if debug.field.full_name.contains("Second") {
                     println!("{:?} {:?} {:?}", debug.path, debug.field.full_name, result);
                 }
+                /*
+
+                if debug
+                    .field
+                    .full_name
+                    .contains("CCSPlayerPawn.CCSPlayer_WeaponServices.m_hMyWeapons")
+                    && debug.path[2] != 0
+                {
+                    if let Variant::U32(v) = result {
+                        println!("{:?}", v & 0x7FF);
+                        let eid = v & 0x7FF;
+                        if let Some(e) = self.entities.get(&(eid as i32)) {
+                            if let Some(c) = self.cls_by_id.get(&e.cls_id) {
+                                println!("{:?}", c.name);
+                            }
+                        }
+                    }
+                    println!(
+                        "{:?} {:?} {:?} {:?}",
+                        debug.path, debug.field.full_name, result, field_info.prop_id
+                    );
+                }
+                */
             }
         } else {
             for field_info in &self.field_infos[..n_updates] {
                 let result = bitreader.decode(&field_info.decoder, &self.qf_mapper)?;
                 if field_info.should_parse {
-                    entity.props.insert(field_info.prop_id as u32, result);
+                    // entity.props.insert(field_info.prop_id as u32, result);
                 }
+                entity.props.insert(field_info.prop_id as u32, result);
             }
         }
         Ok(n_updates)
