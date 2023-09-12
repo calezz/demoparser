@@ -58,7 +58,7 @@ fn main() {
         let mut ds = Parser::new(settings);
         let d = ds.parse_demo().unwrap();
         println!("TOTAL {:?}", before.elapsed());
-        println!("{:?}", d.df);
+        // println!("{:?}", d.df);
     }
     println!("TOTAL {:?}", before.elapsed());
 }

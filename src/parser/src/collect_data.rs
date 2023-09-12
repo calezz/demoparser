@@ -461,7 +461,11 @@ impl ParserThread {
                 if let Some(e) = self.entities.get(&(eid as i32)) {
                     if let Some(c) = self.cls_by_id.get(&e.cls_id) {
                         names.push(c.name.to_string());
+                    } else {
+                        println!("clsid: {:?} not found", e.cls_id);
                     }
+                } else {
+                    println!("ENTID: {:?} not found", entity_id);
                 }
                 /*
                 let itemdef = self.prop_controller.special_ids.item_def.unwrap();

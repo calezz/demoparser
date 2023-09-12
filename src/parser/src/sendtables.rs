@@ -515,6 +515,7 @@ pub struct Serializer {
 impl Serializer {
     pub fn find_decoder(&self, path: &FieldPath, pos: usize) -> FieldInfo {
         // SKETCHY EARLY RETURN
+
         if path.path[0] == 86 && path.path[1] == 0 && path.path[2] != 0 {
             return FieldInfo {
                 controller_prop: None,
@@ -523,6 +524,7 @@ impl Serializer {
                 prop_id: MY_WEAPONS_OFFSET + path.path[2] as u32,
             };
         }
+
         self.fields[path.path[pos] as usize].decoder_from_path(path, pos + 1)
     }
     pub fn debug_find_decoder(&self, path: &FieldPath, pos: usize, prop_name: String) -> DebugField {
@@ -533,6 +535,7 @@ impl Serializer {
                 field: None,
             };
         }
+
         let idx = path.path[pos];
         let f = &self.fields[idx as usize];
         f.debug_decoder_from_path(path, pos + 1, prop_name)
