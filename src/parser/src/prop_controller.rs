@@ -251,18 +251,26 @@ impl PropController {
         }
     }
     pub fn handle_prop(&mut self, full_name: &str, f: &mut Field) {
-        if full_name.contains("m_iItemDefinitionIndex") {
-            // println!("{:?} {:?}", full_name, f.);
+        if full_name.contains("Gre") {
+            // println!("{:?} {:?}", full_name, f);
         }
+
+        let WEAPON_CONTAINS_STRINGS = vec!["Weapon", "AK", "Knife", "Deagle"];
+
         // CAK47.m_iClip1 => ["CAK47", "m_iClip1"]
         let split_at_dot: Vec<&str> = full_name.split(".").collect();
-        let is_weapon_prop = (split_at_dot[0].contains("Weapon") || split_at_dot[0].contains("AK"))
-            && !split_at_dot[0].contains("Player")
+        let is_weapon_prop = (split_at_dot[0].contains("Weapon")
+            || split_at_dot[0].contains("AK")
             || split_at_dot[0].contains("Knife")
-            || split_at_dot[0].contains("CDEagle");
+            || split_at_dot[0].contains("CDEagle"))
+            && !split_at_dot[0].contains("Player");
+
+        if is_weapon_prop {
+            // println!("{:?}", split_at_dot[0]);
+        }
 
         let is_projectile_prop = (split_at_dot[0].contains("Projectile") || split_at_dot[0].contains("Grenade"))
-            && !split_at_dot[0].contains("Player");
+            || split_at_dot[0].contains("Flash") && !split_at_dot[0].contains("Player");
         let is_grenade_or_weapon = is_weapon_prop || is_projectile_prop;
 
         // Strip first part of name from grenades and weapons.

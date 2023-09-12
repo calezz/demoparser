@@ -74,7 +74,7 @@ impl ParserThread {
             match cmd {
                 EntityCmd::Delete => {
                     self.projectiles.remove(&entity_id);
-                    // self.entities.remove(&entity_id);
+                    self.entities.remove(&entity_id);
                 }
                 EntityCmd::CreateAndUpdate => {
                     self.create_new_entity(&mut bitreader, &entity_id)?;
@@ -105,8 +105,11 @@ impl ParserThread {
             for (field_info, debug) in self.field_infos[..n_updates].iter().zip(&self.debug_fields) {
                 let result = bitreader.decode(&field_info.decoder, &self.qf_mapper)?;
                 // self.game_events_counter.insert(debug.field.full_name.clone());
-                if debug.field.full_name.contains("Damage") {
-                    println!("{:?} {:?} {:?}", debug.path, debug.field.full_name, result);
+                if debug.field.full_name.contains("CWeaponTec9") && debug.field.full_name.contains("Def") {
+                    println!(
+                        "{:?} {:?} {:?} {:?} {:?}",
+                        debug.path, debug.field.full_name, result, field_info.prop_id, self.tick
+                    );
                 }
                 /*
                 if debug

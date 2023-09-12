@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::entities::PlayerMetaData;
 use super::variants::Variant;
 use crate::maps::BUTTONMAP;
@@ -449,34 +451,54 @@ impl ParserThread {
         }
     }
     pub fn find_my_equipment(&self, entity_id: &i32) -> Result<Variant, PropCollectionError> {
-        let weapons_id = match self.prop_controller.special_ids.my_weapons {
-            Some(id) => id,
-            None => return Err(PropCollectionError::MyWeaponsIdNotSet),
-        };
         let mut names = vec![];
+        let mut entites_collected = vec![];
+
         for i in 0..32 {
             let prop_id = MY_WEAPONS_OFFSET + i;
             if let Ok(Variant::U32(e)) = self.get_prop_from_ent(&(prop_id as u32), entity_id) {
                 let eid = e & 0x7FF;
+                // For some reason ive seen the same entity be referred to multiple times
+                if entites_collected.contains(&eid) {
+                    continue;
+                }
                 if let Some(e) = self.entities.get(&(eid as i32)) {
-                    if let Some(c) = self.cls_by_id.get(&e.cls_id) {
-                        names.push(c.name.to_string());
-                    } else {
-                        println!("clsid: {:?} not found", e.cls_id);
+                    for (n, v) in &e.props {
+                        let name = self.prop_controller.id_to_name.get(n);
+                        if name.is_some() {
+                            // println!("{:?} {:?} {:?}", n, name, v);
+                        }
                     }
-                } else {
-                    println!("ENTID: {:?} not found", entity_id);
+                    if let Some(c) = self.cls_by_id.get(&e.cls_id) {
+                        if c.name.contains("Aug") {
+                            for (n, v) in &e.props {
+                                let name = self.prop_controller.id_to_name.get(n);
+                                if name.is_some() {
+                                    // println!("{:?} {:?} {:?}", n, name, v);
+                                }
+                            }
+                        }
+                        let res = self.get_prop_from_ent(&1128, &e.entity_id);
+                        if res.is_err() {
+                            // println!("******************** {:?} *************************", c.name);
+                            // println!("{:?} {:?}", c.name, self.get_prop_from_ent(&1128, &e.entity_id));
+                            for (n, v) in &e.props {
+                                let name = self.prop_controller.id_to_name.get(n);
+                                //if name.is_some() {
+                                //println!("{:?} {:?} {:?} {:?}", n, name, v, self.tick);
+                                //}
+                            }
+                            println!(
+                                "{:?} {:?} {:?}",
+                                c.name,
+                                self.get_prop_from_ent(&1128, &e.entity_id),
+                                self.tick
+                            );
+                        }
+                        entites_collected.push(eid);
+                        names.push(c.name.to_string());
+                    }
                 }
-                /*
-                let itemdef = self.prop_controller.special_ids.item_def.unwrap();
-                if let Ok(Variant::U32(itdef)) = self.get_prop_from_ent(&itemdef, &(eid as i32)) {
-                    let res = match WEAPINDICIES.get(&itdef) {
-                        Some(v) => Ok(Variant::String(v.to_string())),
-                        None => Err(PropCollectionError::WeaponIdxMappingNotFound),
-                    };
-                    println!("RES {:?}", res);
-                }
-                */
             }
         }
         Ok(Variant::List(names))
