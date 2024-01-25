@@ -154,8 +154,8 @@ See more at https://en.wikipedia.org/wiki/AoS_and_SoA
 
 
 <br/><br/>
-```Python
-def list_game_events(): -> List[str]
+```JavaScript
+list_game_events("path_to_demo.dem")
 ```
 
 
@@ -163,8 +163,8 @@ def list_game_events(): -> List[str]
 Notice that this function is rougly as slow as a call to parse_event/parse_events.
 
 <br/><br/>
-```Python
-def parse_header(): -> Dict<str, str>
+```JavaScript
+parseHeader("path_to_demo.dem")
 ```
 Output should be something like this:
 ```JavaScript
@@ -186,8 +186,8 @@ Output should be something like this:
 Mainly people care about the map_name field.
 
 <br/><br/>
-```Python
-def parse_player_info(): -> DataFrame
+```JavaScript
+parsePlayerInfo("path_to_demo.dem")
 ```
 
 Example output:
@@ -206,13 +206,13 @@ Example output:
 ]
 ```
 <br/><br/>
-```Python
-def parse_grenades(): -> DataFrame
+```JavaScript
+parseGrenades("path_to_demo.dem")
 ```
 Returns all coordinates of all grenades along with info about thrower.
 
 ```JavaScript
-[  
+[     
   {
     entity_id: 280,
     grenade_type: 'SmokeGrenade',
