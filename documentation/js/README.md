@@ -155,7 +155,7 @@ See more at https://en.wikipedia.org/wiki/AoS_and_SoA
 
 <br/><br/>
 ```JavaScript
-list_game_events("path_to_demo.dem")
+listGameEvents("path_to_demo.dem")
 ```
 
 
